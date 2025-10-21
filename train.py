@@ -6,7 +6,8 @@ from sys import path
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning import seed_everything
+from pytorch_lightning import Trainer, seed_everything
+
 # set seeds for sklearn
 from sklearn.utils import check_random_state
 from torch.utils.data import DataLoader
@@ -17,18 +18,18 @@ logger = getLogger(__name__)
 
 
 @hydra.main(
-    config_path="./configs/classification", 
+    config_path="./configs/classification",
     # config_name="config",
-    version_base="1.3"
+    version_base="1.3",
 )
 def main(cfg: DictConfig):
-    
+
     ##############################
     ####### DATASET SETUP ########
     ##############################
     dataset = instantiate(cfg.dataset)
     train_set, val_set, test_set = dataset.get_splits()
-    
+
     train_loader = DataLoader(
         train_set,
         batch_size=cfg.training.batch_size,
@@ -47,14 +48,22 @@ def main(cfg: DictConfig):
         shuffle=False,
         num_workers=cfg.training.num_workers,
     )
+
+    #############################
+    ####### MODELS SETUP ########
+    #############################
+    engine = instantiate(cfg.engine)
+
+    trainer = instantiate(cfg.trainer)
     
     #############################
-    ####### ENGINE SETUP ########
+    ####### MODELS TRAIN ########
     #############################
-    
-    
-    ...
-    
+
+    trainer.fit(engine, train_loader, val_loader)
+
+    trainer.test(engine, test_loader, ckpt_path="best")
+
 
 if __name__ == "__main__":
     main()

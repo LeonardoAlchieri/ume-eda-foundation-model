@@ -111,9 +111,16 @@ class EDAtaNoLabel(Dataset):
                     logger.warning(f"File does not exist: {file_path}")
                     continue
                 try:
-                    data = np.load(file_path)
-                    all_data.append(data)
-                    logger.info(f"Loaded {data.shape} from {file_path}")
+                    # Load .npz file
+                    npz_data = np.load(file_path)
+                    # .npz files are dictionary-like, get the first array
+                    # Usually saved with np.savez(filename, array) which stores as 'arr_0'
+                    if len(npz_data.files) > 0:
+                        data: np.ndarray = npz_data['values']
+                        all_data.append(data)
+                        logger.info(f"Loaded {data.shape} from {file_path}")
+                    else:
+                        logger.warning(f"No arrays found in {file_path}")
                 except Exception as e:
                     logger.error(f"Error loading {file_path}: {e}")
                     raise e

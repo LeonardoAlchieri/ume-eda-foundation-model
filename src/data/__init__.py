@@ -1,5 +1,5 @@
 """Data loading utilities."""
 
-from .dataset import MultiNpyDataset
+from .dataset import EDAtaNoLabel
 
-__all__ = ['MultiNpyDataset']
+__all__ = ['EDAtaNoLabel']

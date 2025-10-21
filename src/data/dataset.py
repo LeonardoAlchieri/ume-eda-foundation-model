@@ -43,7 +43,7 @@ class EDAtaNoLabel(Dataset):
     ):
         """Initialize the dataset."""
         self.base_path = Path(base_path)
-        self.dataset_names = dataset_names
+        self.dataset_names = self._check_dataset_names(dataset_names)
         self.shuffle = shuffle
         self.seed = seed
 
@@ -59,6 +59,18 @@ class EDAtaNoLabel(Dataset):
         logger.info(
             f"Loaded dataset with {len(self.data)} samples from {len(dataset_names)} dataset(s)"
         )
+        
+    def _check_dataset_names(self, dataset_names: List[str]):
+        """Check if the provided dataset names exist in the base path."""
+        if dataset_names == "all":
+            dataset_names = [
+                d.name for d in self.base_path.iterdir() if d.is_dir()
+            ]
+        for name in dataset_names:
+            dataset_path = self.base_path / name
+            if not dataset_path.exists() or not dataset_path.is_dir():
+                raise ValueError(f"Dataset path does not exist or is not a directory: {dataset_path}")
+        return dataset_names
         
     def get_splits(self):
         """

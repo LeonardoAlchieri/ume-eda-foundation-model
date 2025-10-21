@@ -272,7 +272,7 @@ class TestEDAtaNoLabelErrorHandling:
     
     def test_nonexistent_base_path(self):
         """Test error when base path doesn't exist."""
-        with pytest.raises(ValueError, match="No data loaded"):
+        with pytest.raises(ValueError, match="Dataset path does not exist or is not a directory"):
             EDAtaNoLabel(
                 base_path="/nonexistent/path",
                 dataset_names=["dataset1"],
@@ -280,16 +280,14 @@ class TestEDAtaNoLabelErrorHandling:
             )
     
     def test_nonexistent_dataset(self, temp_data_dir):
-        """Test warning when dataset folder doesn't exist."""
-        # Should log warning but not fail if at least one dataset exists
-        dataset = EDAtaNoLabel(
-            base_path=temp_data_dir,
-            dataset_names=["dataset2", "nonexistent_dataset"],
-            shuffle=False,
-        )
-        
-        # Should still load dataset2
-        assert len(dataset) == 150
+        """Test error when dataset folder doesn't exist."""
+        # With the current implementation, this raises an error immediately
+        with pytest.raises(ValueError, match="Dataset path does not exist or is not a directory"):
+            EDAtaNoLabel(
+                base_path=temp_data_dir,
+                dataset_names=["dataset2", "nonexistent_dataset"],
+                shuffle=False,
+            )
     
     def test_empty_dataset_list(self, empty_data_dir):
         """Test error when no datasets have data."""

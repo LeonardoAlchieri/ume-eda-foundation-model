@@ -1,0 +1,337 @@
+from typing import Any, Optional, Mapping, Type
+import pickle
+
+import numpy as np
+import torch
+from torch import nn
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler
+from torchmetrics import Metric, MetricCollection
+import pytorch_lightning as pl
+
+
+class BaseSelfSupervisedEngine(pl.LightningModule):
+    """
+    Base PyTorch Lightning engine for self-supervised learning.
+    
+    This engine requires models to implement a `loss(output, batch, step)` method
+    for computing the loss.
+    """
+    
+    def __init__(
+        self,
+        model: nn.Module,
+        metrics: Optional[Mapping[str, Metric]] = None,
+        optimizer: Optional[Type[Optimizer]] = None,
+        optimizer_kwargs: Optional[Mapping[str, Any]] = None,
+        scheduler: Optional[Type[_LRScheduler]] = None,
+        scheduler_kwargs: Optional[Mapping[str, Any]] = None,
+        data_augmentation: Optional[nn.Module] = None,
+    ):
+        """
+        Args:
+            model: The model to train (must implement loss method)
+            metrics: Dictionary of metrics to track during training/validation/testing
+            optimizer: Optimizer class (e.g., torch.optim.Adam)
+            optimizer_kwargs: Keyword arguments for optimizer initialization
+            scheduler: Learning rate scheduler class (e.g., torch.optim.lr_scheduler.CosineAnnealingLR)
+            scheduler_kwargs: Keyword arguments for scheduler initialization
+            data_augmentation: Data augmentation pipeline (nn.Module) to apply to batch
+        """
+        super(BaseSelfSupervisedEngine, self).__init__()
+        self.model = model
+        self.save_hyperparameters(ignore=["model", "data_augmentation"], logger=False)
+
+        # Store optimizer and scheduler classes and configs
+        self.optimizer_class = optimizer or torch.optim.Adam
+        self.optimizer_kwargs = optimizer_kwargs or dict()
+        self.scheduler_class = scheduler
+        self.scheduler_kwargs = scheduler_kwargs or dict()
+        
+        # Store data augmentation pipeline
+        self.data_augmentation = data_augmentation
+
+        # Setup metrics
+        if metrics is None:
+            metrics = dict()
+        self._set_metrics(metrics)
+
+    def forward(self, batch):
+        """Forward pass through the model."""
+        raise NotImplementedError("Subclasses must implement the forward method.")
+
+    def predict(self, *args, **kwargs):
+        """Prediction method."""
+        return self.model(*args, **kwargs)
+    
+    @staticmethod
+    def _check_metric(metric):
+        """Clone and reset a metric."""
+        if metric is None:
+            return None
+        metric = metric.clone()
+        metric.reset()
+        return metric
+    
+    def _set_metrics(self, metrics):
+        """
+        Setup metric collections for train/val/test splits.
+        
+        Args:
+            metrics: Dictionary of metric name -> Metric objects
+        """
+        # Create metric collections for each split
+        valid_metrics = {k: v for k, v in metrics.items() if v is not None}
+        
+        if valid_metrics:
+            self.train_metrics = MetricCollection(
+                metrics={k: self._check_metric(m) for k, m in valid_metrics.items()},
+                prefix="train/"
+            )
+            self.val_metrics = MetricCollection(
+                metrics={k: self._check_metric(m) for k, m in valid_metrics.items()},
+                prefix="val/"
+            )
+            self.test_metrics = MetricCollection(
+                metrics={k: self._check_metric(m) for k, m in valid_metrics.items()},
+                prefix="test/"
+            )
+        else:
+            self.train_metrics = None
+            self.val_metrics = None
+            self.test_metrics = None      
+
+    def log_metrics(self, metrics, **kwargs):
+        """Log metrics to logger."""
+        if metrics is not None:
+            self.log_dict(
+                metrics, on_step=False, on_epoch=True, logger=True, prog_bar=True, **kwargs
+            )
+
+    def log_loss(self, name, loss, **kwargs):
+        """Log loss value to logger."""
+        self.log(
+            name + "_loss",
+            loss.detach() if isinstance(loss, torch.Tensor) else loss,
+            on_step=False,
+            on_epoch=True,
+            logger=True,
+            prog_bar=True,
+            **kwargs,
+        )
+    
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        """
+        Hook called after batch is transferred to device.
+        Applies data augmentation and adds batch_size.
+        
+        This method should be overridden by subclasses to implement
+        specific augmentation strategies.
+        """
+        if isinstance(batch, dict):
+            # Extract batch size from the batch
+            if 'x' in batch:
+                batch['batch_size'] = batch['x'].shape[0]
+            elif len(batch) > 0:
+                # Get batch size from first tensor in batch
+                first_value = next(iter(batch.values()))
+                if isinstance(first_value, torch.Tensor):
+                    batch['batch_size'] = first_value.shape[0]
+        return batch
+
+    def update_and_log_metrics(self, step, output, batch):
+        """
+        Update and log metrics for a given step (train/val/test).
+        
+        Args:
+            step: One of 'train', 'val', or 'test'
+            output: Model output (dict or tensor)
+            batch: Input batch dict
+        """
+        metric_collection = getattr(self, f"{step}_metrics", None)
+        
+        if metric_collection is None:
+            return
+        
+        # If model provides method to extract predictions for metrics, use it
+        if hasattr(self.model, 'get_predictions_for_metrics'):
+            predictions, targets = self.model.get_predictions_for_metrics(output, batch)
+            if predictions is not None and targets is not None:
+                metric_collection.update(predictions, targets)
+                batch_size = batch.get('batch_size', 1)
+                self.log_metrics(metric_collection, batch_size=batch_size)
+
+    def shared_step(self, batch, step):
+        """
+        Shared step for train/val/test.
+        Computes forward pass and loss using model's loss method.
+        
+        Args:
+            batch: Input batch
+            step: One of 'train', 'val', or 'test'
+            
+        Returns:
+            Tuple of (loss, output)
+        """
+        # Forward pass through model
+        output = self.forward(batch)
+        
+        # Compute loss using model's loss method
+        loss = self.model.loss(output, batch, step=step)
+        
+        return loss, output
+
+    def training_step(self, batch, batch_idx):
+        """Training step."""
+        loss, output = self.shared_step(batch, step='train')
+        
+        if torch.isnan(loss).any():
+            print(f'Warning: NaN loss at epoch {self.current_epoch}, batch {batch_idx}')
+        
+        # Update metrics and log
+        if output is not None:
+            self.update_and_log_metrics("train", output, batch)
+        
+        batch_size = batch.get('batch_size', 1)
+        self.log_loss("train", loss, batch_size=batch_size)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        """Validation step."""
+        val_loss, output = self.shared_step(batch, step='val')
+        
+        # Update metrics and log
+        if output is not None:
+            self.update_and_log_metrics("val", output, batch)
+        
+        batch_size = batch.get('batch_size', 1)
+        self.log_loss("val", val_loss, batch_size=batch_size)
+        return val_loss
+    
+    def test_step(self, batch, batch_idx):
+        """Test step."""
+        test_loss, output = self.shared_step(batch, step='test')
+        
+        # Update metrics and log
+        if output is not None:
+            self.update_and_log_metrics("test", output, batch)
+        
+        batch_size = batch.get('batch_size', 1)
+        self.log_loss("test", test_loss, batch_size=batch_size)
+        return test_loss
+
+    def on_test_epoch_end(self):
+        """Hook called at the end of test epoch."""
+        if self.test_metrics is not None:
+            # Compute and log final test metrics
+            final_metrics = self.test_metrics.compute()
+            for metric_name, value in final_metrics.items():
+                print(f"{metric_name}: {value.item() if isinstance(value, torch.Tensor) else value}")
+
+    def configure_optimizers(self):
+        """Configure optimizers and learning rate schedulers."""
+        cfg = dict()
+        
+        # Create optimizer with stored class and kwargs
+        optimizer = self.optimizer_class(self.parameters(), **self.optimizer_kwargs)
+        cfg["optimizer"] = optimizer
+        
+        # Setup scheduler if provided
+        if self.scheduler_class is not None:
+            scheduler_kwargs = self.scheduler_kwargs.copy()
+            metric = scheduler_kwargs.pop("monitor", None)
+            scheduler = self.scheduler_class(optimizer, **scheduler_kwargs)
+            cfg["lr_scheduler"] = scheduler
+            if metric is not None:
+                cfg["monitor"] = metric
+        
+        return cfg
+
+
+class ContrastiveEngine(BaseSelfSupervisedEngine):
+    """
+    Engine for contrastive learning.
+    
+    Creates two augmented views (x_1 and x_2) from batch['x'] using
+    the data augmentation pipeline.
+    """
+    
+    def forward(self, batch):
+        """Forward pass through the model."""
+        x_1 = batch['x_1']
+        x_2 = batch['x_2']
+        return self.model(x_1, x_2)
+    
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        """
+        Hook called after batch is transferred to device.
+        Creates x_1 and x_2 from x using data augmentation for contrastive learning.
+        Data augmentation is only applied during training.
+        """
+        if isinstance(batch, dict) and 'x' in batch:
+            # Apply data augmentation to create two views only during training
+            if self.data_augmentation is not None and self.training:
+                # Convert to numpy for augmentation
+                x = batch['x']
+                x_np = x.cpu().numpy()
+                device = x.device
+
+                # Vectorized augmentation function
+                augment_fn = np.vectorize(self.data_augmentation, signature='(t)->(t)' if len(x.shape) == 2 else '(t,c)->(t,c)')
+
+                # Apply augmentation in a vectorized way
+                batch_aug_1_np = augment_fn(x_np)
+                batch_aug_2_np = augment_fn(x_np)
+
+                # Convert back to tensor
+                batch_aug_1 = torch.from_numpy(batch_aug_1_np).float().to(device)
+                batch_aug_2 = torch.from_numpy(batch_aug_2_np).float().to(device)
+                
+                batch['x_1'] = batch_aug_1
+                batch['x_2'] = batch_aug_2
+            else:
+                # If no augmentation or not training, just copy x to x_1 and x_2
+                batch['x_1'] = batch['x']
+                batch['x_2'] = batch['x']
+            
+            # Add batch size
+            batch['batch_size'] = batch['x'].shape[0]
+        
+        return batch
+
+
+class ReconstructionEngine(BaseSelfSupervisedEngine):
+    """
+    Engine for reconstruction learning (e.g., autoencoders, denoising).
+    
+    Creates one augmented view (x_aug) from batch['x'] using
+    the data augmentation pipeline.
+    """
+    def forward(self, batch):
+        """Forward pass through the model."""
+        x_aug = batch['x_aug']
+        return self.model(x_aug)
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        """
+        Hook called after batch is transferred to device.
+        Creates x_aug from x using data augmentation for reconstruction learning.
+        Data augmentation is only applied during training.
+        """
+        if isinstance(batch, dict) and 'x' in batch:
+            # Apply data augmentation to create augmented view only during training
+            if self.data_augmentation is not None and self.training:
+                batch_aug = self.data_augmentation({'x': batch['x']}, prep_keys={'x'})
+                batch['x_aug'] = batch_aug['x']
+            else:
+                # If no augmentation or not training, just copy x to x_aug
+                batch['x_aug'] = batch['x']
+            
+            # Add batch size
+            batch['batch_size'] = batch['x'].shape[0]
+        
+        return batch
+
+
+# Backward compatibility alias
+SelfSupervisedEngine = BaseSelfSupervisedEngine

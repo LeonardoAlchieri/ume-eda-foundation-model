@@ -3,6 +3,7 @@ from pathlib import Path
 from pprint import pprint
 from sys import path
 
+
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
@@ -18,35 +19,32 @@ logger = getLogger(__name__)
 
 
 @hydra.main(
-    config_path="./configs/classification",
-    # config_name="config",
+    config_path="./configs/train",
+    config_name="example_contrastive", # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):
+    # TODO: set the device!
+    # TODO: missing loss
 
     ##############################
     ####### DATASET SETUP ########
     ##############################
     dataset = instantiate(cfg.dataset)
+    # TODO: add other split possibilitiesn using custom classes
     train_set, val_set, test_set = dataset.get_splits()
 
     train_loader = DataLoader(
         train_set,
-        batch_size=cfg.training.batch_size,
-        shuffle=True,
-        num_workers=cfg.training.num_workers,
+        **cfg.dataloader,
     )
     val_loader = DataLoader(
         val_set,
-        batch_size=cfg.training.batch_size,
-        shuffle=False,
-        num_workers=cfg.training.num_workers,
+        **cfg.dataloader,
     )
     test_loader = DataLoader(
         test_set,
-        batch_size=cfg.training.batch_size,
-        shuffle=False,
-        num_workers=cfg.training.num_workers,
+        **cfg.dataloader,
     )
 
     #############################
@@ -55,7 +53,7 @@ def main(cfg: DictConfig):
     engine = instantiate(cfg.engine)
 
     trainer = instantiate(cfg.trainer)
-    
+
     #############################
     ####### MODELS TRAIN ########
     #############################

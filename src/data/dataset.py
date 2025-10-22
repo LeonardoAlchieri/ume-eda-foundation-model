@@ -2,6 +2,8 @@
 Generic dataset class for loading multiple .npy files.
 """
 
+from collections.abc import Iterable
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset, random_split
@@ -24,12 +26,17 @@ class EDAtaNoLabel(Dataset):
         dataset_names: List of dataset folder names to load
         shuffle: Whether to shuffle the data after loading
         seed: Random seed for shuffling (for reproducibility)
+        channels: Channel indices to select. Can be:
+            - None: Use all channels (default)
+            - int: Select single channel, output shape will be (T,)
+            - List[int]: Select multiple channels, output shape will be (T, C)
 
     Example:
         >>> dataset = EDAtaNoLabel(
         ...     base_path='/path/to/data',
         ...     dataset_names=['USILaughs', 'BiHeartS', 'APSYNC'],
-        ...     shuffle=True
+        ...     shuffle=True,
+        ...     channels=0  # Select only first channel
         ... )
     """
 
@@ -40,12 +47,14 @@ class EDAtaNoLabel(Dataset):
         shuffle: bool = True,
         train_val_test_size: Optional[tuple] = None,
         seed: Optional[int] = None,
+        channels: Optional[Union[int, List[int]]] = None,
     ):
         """Initialize the dataset."""
         self.base_path = Path(base_path)
         self.dataset_names = self._check_dataset_names(dataset_names)
         self.shuffle = shuffle
         self.seed = seed
+        self.channels = channels
 
         # Load all data
         self.data = self._load_data()
@@ -57,7 +66,7 @@ class EDAtaNoLabel(Dataset):
             self._shuffle_data()
 
         logger.info(
-            f"Loaded dataset with {len(self.data)} samples from {len(dataset_names)} dataset(s)"
+            f"Loaded dataset with {len(self.data)} samples from {len(self.dataset_names)} dataset(s)"
         )
         
     def _check_dataset_names(self, dataset_names: List[str]):
@@ -83,12 +92,8 @@ class EDAtaNoLabel(Dataset):
             raise ValueError("train_val_test_size must be provided for splitting the dataset.")
 
         train_size, val_size, test_size = self.train_val_test_size
-        total_size = len(self)
-
-        if train_size + val_size + test_size != total_size:
-            raise ValueError(
-                f"Sum of train, val, and test sizes must equal total dataset size ({total_size})."
-            )
+        if train_size + val_size + test_size != 1:
+            raise ValueError("train_val_test_size must sum to 1.")
 
         train_set, val_set, test_set = random_split(
             self,
@@ -144,6 +149,25 @@ class EDAtaNoLabel(Dataset):
 
         # Concatenate all data along first axis
         concatenated_data = np.concatenate(all_data, axis=0)
+        
+        # Apply channel selection if specified
+        if self.channels is not None:
+            if isinstance(self.channels, int):
+                # Single channel: output shape (N, T)
+                concatenated_data = concatenated_data[..., self.channels]
+                logger.info(f"Selected channel {self.channels}, new shape: {concatenated_data.shape}")
+            elif isinstance(self.channels, Iterable):
+                # Multiple channels: output shape (N, T, C)
+                concatenated_data = concatenated_data[..., self.channels]
+                logger.info(f"Selected channels {self.channels}, new shape: {concatenated_data.shape}")
+            else:
+                raise ValueError(f"channels must be None, int, or Iterable[int], got {type(self.channels)}")
+        else:
+            # Use all channels, squeeze if only one channel
+            if concatenated_data.shape[-1] == 1:
+                concatenated_data = concatenated_data[..., 0]
+                logger.info(f"Squeezed single channel, new shape: {concatenated_data.shape}")
+                
         logger.info(f"Concatenated data shape: {concatenated_data.shape}")
 
         return concatenated_data
@@ -171,6 +195,7 @@ class EDAtaNoLabel(Dataset):
 
         Returns:
             Dictionary with 'x' key containing the data sample as a torch tensor
+            Shape: (T,) if single channel, (T, C) if multiple channels
         """
         # Load sample and convert to tensor
         sample = self.data[idx]
@@ -198,4 +223,5 @@ class EDAtaNoLabel(Dataset):
             "dataset_names": self.dataset_names,
             "base_path": str(self.base_path),
             "shuffled": self.shuffle,
+            "channels": self.channels,
         }

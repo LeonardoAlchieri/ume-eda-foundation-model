@@ -60,7 +60,8 @@ def main(cfg: DictConfig):
 
     trainer.fit(engine, train_loader, val_loader)
 
-    trainer.test(engine, test_loader, ckpt_path="best")
+    # trainer.test(engine, test_loader, ckpt_path="best")
+    trainer.test(engine, test_loader)
 
 
 if __name__ == "__main__":

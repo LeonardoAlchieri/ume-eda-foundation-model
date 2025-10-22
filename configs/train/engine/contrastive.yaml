@@ -25,7 +25,8 @@ scheduler: null
 
 # Data augmentation - Compose multiple augmentations
 data_augmentation:
-  _target_: torchvision.transforms.Compose
+  # _target_: torchvision.transforms.Compose
+  _target_: torchvision.transforms.RandomChoice
   transforms:
     - _target_: src.data_augmentation.matton_augment.AmplitudeWarpingStochastic
       sigma_min: 0.01

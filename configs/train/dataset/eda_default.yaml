@@ -1,7 +1,7 @@
 # Default dataset configuration
 
 _target_: src.data.dataset.EDAtaNoLabel
-base_path: "./data.nosync"
+base_path: "./data.nosync/60s"
 dataset_names: "all" # options: list of dataset names or "all"
 shuffle: true
 train_val_test_size: [0.8, 0.1, 0.1]

@@ -113,7 +113,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         self.log(
             name + "_loss",
             loss.detach() if isinstance(loss, torch.Tensor) else loss,
-            on_step=False,
+            on_step=True,
             on_epoch=True,
             logger=True,
             prog_bar=True,

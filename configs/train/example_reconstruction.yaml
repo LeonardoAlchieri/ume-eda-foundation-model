@@ -2,7 +2,7 @@
 # Run with: python train.py --config-name=example_reconstruction
 
 defaults:
-  - model: encoder_decoder
+  - model: vae
   - engine: reconstruction
   - dataset: eda_default
   - dataloader: default
@@ -12,31 +12,34 @@ defaults:
 
 # Experiment settings
 experiment_name: reconstruction_eda_experiment
-seed: 42
+seed: 600
 
 # Save configuration
 save_final_checkpoint: true
 
 # Trainer configuration
 trainer:
-  max_epochs: 100
-  accelerator: auto
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 400
+  accelerator: cpu
   devices: auto
-  log_every_n_steps: 50
+  log_every_n_steps: 10
   deterministic: false
-  gradient_clip_val: 0.0
+  gradient_clip_val: 1.0
   accumulate_grad_batches: 1
   precision: "32"
-  fast_dev_run: false
+  # fast_dev_run: 50
   check_val_every_n_epoch: 1
+  # profiler: simple
 
 # Override dataloader settings
 dataloader:
-  batch_size: 64
+  batch_size: 256
   shuffle: true
-  num_workers: 4
+  num_workers: 6
   pin_memory: true
   drop_last: true
+  persistent_workers: true
 
 # Override engine optimizer settings
 engine:

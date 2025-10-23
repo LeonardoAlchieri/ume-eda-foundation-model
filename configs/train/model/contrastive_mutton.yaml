@@ -16,5 +16,5 @@ transform_head:
   output_dim: 32
 
 loss_fn:
-  _target_: src.model.loss.contrastive.NCELoss
+  _target_: src.model.loss.contrastive.NCELossCorrected
   temperature: 0.1

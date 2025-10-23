@@ -7,23 +7,24 @@ model: ${model}
 # Optimizer configuration
 optimizer:
   _target_: torch.optim.Adam
+  _partial_: true
 optimizer_kwargs:
   lr: 0.001
   weight_decay: 0.0001
 
 # Learning rate scheduler configuration
-scheduler:
-  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-scheduler_kwargs:
-  T_max: 100
-  eta_min: 0.00001
-  monitor: val_loss
+# scheduler:
+#   _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+# scheduler_kwargs:
+#   T_max: 100
+#   eta_min: 0.00001
+#   monitor: val_loss
 
 # Data augmentation
-data_augmentation:
-  _target_: src.data_augmentation.matton_augment.GaussianNoiseStochastic
-  sigma_scale_min: 0.0
-  sigma_scale_max: 0.3
+# data_augmentation:
+#   _target_: src.data_augmentation.matton_augment.GaussianNoiseStochastic
+#   sigma_scale_min: 0.0
+#   sigma_scale_max: 0.3
 
 # Metrics
 metrics: null

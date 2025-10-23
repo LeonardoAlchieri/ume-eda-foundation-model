@@ -1,9 +1,10 @@
 # Default dataset configuration
 
 _target_: src.data.dataset.EDAtaNoLabel
-base_path: "./data.nosync/60s"
+base_path: "./data.nosync/30s"
 dataset_names: "all" # options: list of dataset names or "all"
 shuffle: true
 train_val_test_size: [0.8, 0.1, 0.1]
 seed: 42
 channels: 0  # Channel to use (e.g., 0 for first channel). Use None for all channels. Use a list for multiple channels.
+z_norm: true

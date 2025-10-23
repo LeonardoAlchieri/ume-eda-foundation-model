@@ -5,6 +5,63 @@ import torch.nn as nn
 import torch
 
 
+# src/model/loss/contrastive.py
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class NCELossCorrected(nn.Module):
+    """
+    Normalized Temperature-scaled Cross Entropy Loss (NT-Xent / InfoNCE).
+    
+    Used in SimCLR and other contrastive learning methods.
+    """
+    
+    def __init__(self, temperature=0.1):
+        super(NCELossCorrected, self).__init__()
+        self.temperature = temperature
+
+    def forward(self, z_1, z_2):
+        """
+        Compute NT-Xent loss.
+        
+        Args:
+            z_1: First view embeddings [batch_size, dim]
+            z_2: Second view embeddings [batch_size, dim]
+            
+        Returns:
+            Loss value
+        """
+        batch_size = z_1.shape[0]
+        
+        # Normalize embeddings to unit sphere
+        z_1 = F.normalize(z_1, dim=1)
+        z_2 = F.normalize(z_2, dim=1)
+        
+        # Concatenate both views [2*batch_size, dim]
+        representations = torch.cat([z_1, z_2], dim=0)
+        
+        # Compute cosine similarity matrix [2*batch_size, 2*batch_size]
+        similarity_matrix = torch.matmul(representations, representations.T) / self.temperature
+        
+        # Create positive pair labels
+        # For sample i: positive is at position i+batch_size (and vice versa)
+        labels = torch.cat([
+            torch.arange(batch_size, 2 * batch_size),  # For z_1, positives are in z_2
+            torch.arange(0, batch_size)  # For z_2, positives are in z_1
+        ], dim=0).to(z_1.device)
+        
+        # Mask out self-similarity (diagonal)
+        mask = torch.eye(2 * batch_size, dtype=torch.bool, device=z_1.device)
+        similarity_matrix = similarity_matrix.masked_fill(mask, float('-inf'))
+        
+        # Compute cross-entropy loss
+        loss = F.cross_entropy(similarity_matrix, labels)
+        
+        return loss
+    
+
 class NCELoss(nn.Module):
     """
     Noise Contrastive Estimation Loss

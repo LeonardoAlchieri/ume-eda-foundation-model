@@ -78,7 +78,7 @@ class EncoderDecoderModel(nn.Module):
         """
         return self.decoder_net(h)
 
-    def forward(self, batch):
+    def forward(self, x):
         """
         Forward pass through encoder-decoder architecture.
         
@@ -88,9 +88,6 @@ class EncoderDecoderModel(nn.Module):
         Returns:
             Dictionary with 'reconstruction' and 'latent' representation
         """
-        
-        # Get input
-        x = batch["x_aug"]
         
         # Encode
         h = self.encode(x)

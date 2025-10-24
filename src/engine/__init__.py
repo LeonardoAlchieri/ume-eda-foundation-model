@@ -161,7 +161,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             predictions, targets = self.model.get_predictions_for_metrics(output, batch)
             if predictions is not None and targets is not None:
                 metric_collection.update(predictions, targets)
-                batch_size = batch.get('batch_size', 1)
+                batch_size = batch['batch_size']
                 self.log_metrics(metric_collection, batch_size=batch_size)
 
     def shared_step(self, batch, step):
@@ -195,7 +195,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         if output is not None:
             self.update_and_log_metrics("train", output, batch)
         
-        batch_size = batch.get('batch_size', 1)
+        batch_size = batch['batch_size']
         self.log_loss("train", loss, batch_size=batch_size)
         return loss
 
@@ -207,7 +207,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         if output is not None:
             self.update_and_log_metrics("val", output, batch)
         
-        batch_size = batch.get('batch_size', 1)
+        batch_size = batch['batch_size']
         self.log_loss("val", val_loss, batch_size=batch_size)
         return val_loss
     
@@ -219,7 +219,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         if output is not None:
             self.update_and_log_metrics("test", output, batch)
         
-        batch_size = batch.get('batch_size', 1)
+        batch_size = batch['batch_size']
         self.log_loss("test", test_loss, batch_size=batch_size)
         return test_loss
 
@@ -365,8 +365,9 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         # Get reconstructions from model
         with torch.no_grad():
             self.model.eval()
-            reconstructed = self.model(x_augmented_device)
-            reconstructed = reconstructed[0].detach().cpu()
+            reconstructed = self.model.reconstruct(x_augmented_device)
+            reconstructed = reconstructed.detach().cpu()
+            reconstructed = reconstructed.reshape(x_original.shape)
         
         # Create plots
         self._plot_reconstructions(x_original, x_augmented, reconstructed)

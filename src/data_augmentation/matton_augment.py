@@ -48,7 +48,7 @@ class GaussianNoiseStochastic:
 
 class Identity:
     def __call__(self, x):
-        return batch['x']
+        return x
 
 
 class LowPassFilterDeterministic:
@@ -354,31 +354,31 @@ class TimeShiftDeterministic:
         return x_trf
 
 
-class TimeShiftStochastic:
-    """ Shifts the window left or right by a number of samples """
-    def __init__(self, shift_len_min=120, shift_len_max=240):
-        self.shift_min = shift_len_min
-        self.shift_max = shift_len_max
-        self.shift_lens = np.arange(self.shift_min, self.shift_max, 1)
+# class TimeShiftStochastic:
+#     """ Shifts the window left or right by a number of samples """
+#     def __init__(self, shift_len_min=120, shift_len_max=240):
+#         self.shift_min = shift_len_min
+#         self.shift_max = shift_len_max
+#         self.shift_lens = np.arange(self.shift_min, self.shift_max, 1)
 
-    def __call__(self, x):
-        # FIXME: I do not know what left and right buffer are!
-        # compose x with left and right buffer
-        left_buffer = batch['x_left_buffer']
-        right_buffer = batch['x_right_buffer']
-        # drop nans from left and right buffer segment['x_left_buffer']
-        left_buffer = left_buffer[~np.isnan(left_buffer)]
-        right_buffer = right_buffer[~np.isnan(right_buffer)]
-        signal = np.concatenate([left_buffer, x, right_buffer])
-        # sample shift len to apply
-        shift_len = np.random.choice(self.shift_lens)
-        # adjust so shift is in bounds & sample whether to apply it on left or right
-        left_shift_len = min(shift_len, len(left_buffer))
-        right_shift_len = min(shift_len, len(right_buffer))
-        shift = np.random.choice([-left_shift_len, right_shift_len])  # choose whether to shift left or right in time
-        start_index = len(left_buffer) + shift
-        x_trf = signal[start_index:start_index+len(x)]
-        return x_trf
+#     def __call__(self, x):
+#         # FIXME: I do not know what left and right buffer are!
+#         # compose x with left and right buffer
+#         left_buffer = batch['x_left_buffer']
+#         right_buffer = batch['x_right_buffer']
+#         # drop nans from left and right buffer segment['x_left_buffer']
+#         left_buffer = left_buffer[~np.isnan(left_buffer)]
+#         right_buffer = right_buffer[~np.isnan(right_buffer)]
+#         signal = np.concatenate([left_buffer, x, right_buffer])
+#         # sample shift len to apply
+#         shift_len = np.random.choice(self.shift_lens)
+#         # adjust so shift is in bounds & sample whether to apply it on left or right
+#         left_shift_len = min(shift_len, len(left_buffer))
+#         right_shift_len = min(shift_len, len(right_buffer))
+#         shift = np.random.choice([-left_shift_len, right_shift_len])  # choose whether to shift left or right in time
+#         start_index = len(left_buffer) + shift
+#         x_trf = signal[start_index:start_index+len(x)]
+#         return x_trf
 
 
 class TimeWarpingDeterministic:

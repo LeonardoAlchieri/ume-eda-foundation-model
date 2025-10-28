@@ -483,5 +483,5 @@ class MaskedAutoencoder(nn.Module):
         Returns:
             Reconstruction of shape (batch_size, seq_len, in_channels)
         """
-        pred, _ = self.forward(x, mask_ratio)
-        return self.unpatchify(pred)
+        pred, mask = self.forward(x, mask_ratio)
+        return self.unpatchify(pred), mask

@@ -65,7 +65,7 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         self.log_loss("val_visible", val_loss_visible, batch_size=batch_size)
 
         # Call parent validation_step
-        return super().validation_step(batch, batch_idx)
+        return val_loss
 
     def on_validation_epoch_end(self):
         """
@@ -93,23 +93,14 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
             self.model.eval()
 
             # Check if model has reconstruct method that returns mask
-            if hasattr(self.model, "reconstruct"):
-                result = self.model.reconstruct(x_original_device)
-
+            output = self.model.reconstruct(x_original_device)
+    
                 # Handle different return types
-                if isinstance(result, tuple) and len(result) == 2:
-                    reconstructed, mask = result
-                    mask = mask.detach().cpu()
-                else:
-                    reconstructed = result
-                    mask = None
+            if isinstance(output, tuple) and len(output) == 2:
+                reconstructed, mask = output
+                mask = mask.detach().cpu()
             else:
-                # Fallback for models without reconstruct method
-                output = self.model.forward(x_original_device)
-                if isinstance(output, tuple):
-                    reconstructed = output[0]
-                else:
-                    reconstructed = output
+                reconstructed = output
                 mask = None
 
             reconstructed = reconstructed.detach().cpu()
@@ -118,21 +109,14 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
             if reconstructed.shape != x_original.shape:
                 reconstructed = reconstructed.reshape(x_original.shape)
 
-        # Get masked input if model supports it
-        masked_input = None
-        if mask is not None and hasattr(self.model, "get_masked_input"):
-            with torch.no_grad():
-                masked_input = self.model.get_masked_input(x_original_device, mask)
-                masked_input = masked_input.detach().cpu()
-
         # Create plots
-        self._plot_reconstructions(x_original, reconstructed, mask, masked_input)
+        self._plot_reconstructions(x_original, reconstructed, mask)
 
         # Clear the stored batch for next epoch
         self.validation_batch_for_plotting = None
 
     def _plot_reconstructions(
-        self, x_original, x_reconstructed, mask=None, masked_input=None
+        self, x_original, x_reconstructed, mask=None
     ):
         """
         Create and log overlay plots of original signal with masked regions and reconstruction.
@@ -149,8 +133,6 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         if len(x_original.shape) == 2:
             x_original = x_original.unsqueeze(-1)
             x_reconstructed = x_reconstructed.unsqueeze(-1)
-            if masked_input is not None:
-                masked_input = masked_input.unsqueeze(-1)
 
         n_channels = x_original.shape[-1]
 
@@ -224,24 +206,6 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
                     zorder=1,
                 )
 
-                # Plot masked input if available (dashed orange)
-                if masked_input is not None:
-                    masked_channel = masked_input[sample_idx, :, channel_idx].numpy()
-                    # Only plot non-zero parts to show visible patches
-                    visible_mask = masked_channel != 0
-                    if visible_mask.any():
-                        ax_overlay.plot(
-                            time_steps[visible_mask],
-                            masked_channel[visible_mask],
-                            label="Visible Input",
-                            color="orange",
-                            linewidth=1.5,
-                            alpha=0.7,
-                            linestyle=":",
-                            marker=".",
-                            markersize=3,
-                            zorder=2,
-                        )
 
                 # Plot reconstruction on top (solid green)
                 ax_overlay.plot(

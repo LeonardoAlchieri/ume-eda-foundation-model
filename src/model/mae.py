@@ -485,3 +485,41 @@ class MaskedAutoencoder(nn.Module):
         """
         pred, mask = self.forward(x, mask_ratio)
         return self.unpatchify(pred), mask
+    
+    def get_predictions_for_metrics(self, output, batch):
+        """
+        Extract predictions and targets for metric computation.
+        
+        For MAE, we compare reconstructed patches against original patches.
+        This method extracts predictions and targets in a format suitable
+        for metrics like MSE, MAE, or correlation.
+        
+        Args:
+            output: Tuple of (pred, mask) from forward pass
+                pred: Predicted patches of shape (batch_size, num_patches, patch_size * in_channels)
+                mask: Binary mask of shape (batch_size, num_patches) where 1 = masked, 0 = visible
+            batch: Input batch dictionary with 'x' key
+                x: Original input of shape (batch_size, seq_len, in_channels)
+        
+        Returns:
+            predictions: Reconstructed time series of shape (batch_size, seq_len, in_channels)
+            targets: Original time series of shape (batch_size, seq_len, in_channels)
+        """
+        if output is None:
+            return None, None
+        
+        # Unpack forward output
+        pred, mask = output
+        
+        # Extract original input
+        if isinstance(batch, dict):
+            x = batch['x']
+        else:
+            x = batch
+        
+        # Convert predicted patches back to time series format
+        predictions = self.unpatchify(pred)
+        predictions = predictions.reshape(x.shape)
+        
+        # Return predictions and original targets
+        return predictions, x

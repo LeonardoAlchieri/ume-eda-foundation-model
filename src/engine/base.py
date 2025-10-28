@@ -172,12 +172,12 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             return
 
         # If model provides method to extract predictions for metrics, use it
-        if hasattr(self.model, "get_predictions_for_metrics"):
-            predictions, targets = self.model.get_predictions_for_metrics(output, batch)
-            if predictions is not None and targets is not None:
-                metric_collection.update(predictions, targets)
-                batch_size = batch["batch_size"]
-                self.log_metrics(metric_collection, batch_size=batch_size)
+        
+        predictions, targets = self.model.get_predictions_for_metrics(output, batch)
+        if predictions is not None and targets is not None:
+            metric_collection.update(predictions, targets)
+            batch_size = batch["batch_size"]
+            self.log_metrics(metric_collection, batch_size=batch_size)
 
     def shared_step(self, batch, step):
         """

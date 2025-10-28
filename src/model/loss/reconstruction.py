@@ -87,4 +87,4 @@ class DefaultMAELoss(nn.Module):
         # Weighted combination
         total_loss = self.masked_weight * loss_masked + (1 - self.masked_weight) * loss_visible
         
-        return total_loss
+        return total_loss, loss_masked, loss_visible

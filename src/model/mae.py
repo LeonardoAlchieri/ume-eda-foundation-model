@@ -425,6 +425,36 @@ class MaskedAutoencoder(nn.Module):
             patch_size=self.patch_size,
             in_channels=self.in_channels,
             num_patches=self.num_patches
+        )[0]
+        
+    def loss_components(self, forward_output, batch, **kwargs):
+        """
+        Compute MAE loss components (total, masked, visible).
+        
+        Args:
+            forward_output: Tuple of (predictions, mask)
+            batch: Input batch dictionary with 'x' key
+            **kwargs: Additional arguments
+            
+        Returns:
+            Tuple of (total_loss, loss_masked, loss_visible)
+        """
+        # Extract input
+        if isinstance(batch, dict):
+            x = batch['x']
+        else:
+            x = batch
+            
+        pred, mask = forward_output
+        
+        # Compute loss using the loss function
+        return self.loss_fn(
+            pred=pred,
+            target=x,
+            mask=mask,
+            patch_size=self.patch_size,
+            in_channels=self.in_channels,
+            num_patches=self.num_patches
         )
     
     def unpatchify(self, x):
@@ -451,9 +481,7 @@ class MaskedAutoencoder(nn.Module):
             mask_ratio: Override default mask ratio (optional)
             
         Returns:
-            reconstruction: Reconstruction of shape (batch_size, seq_len, in_channels)
-            mask: Binary mask of shape (batch_size, num_patches) where 1 = masked, 0 = visible
+            Reconstruction of shape (batch_size, seq_len, in_channels)
         """
-        pred, mask = self.forward(x, mask_ratio)
-        reconstruction = self.unpatchify(pred)
-        return reconstruction, mask
+        pred, _ = self.forward(x, mask_ratio)
+        return self.unpatchify(pred)

@@ -9,11 +9,18 @@ optimizer:
   _target_: torch.optim.Adam
   _partial_: true
 optimizer_kwargs:
-  lr: 0.0002
+  lr: 0.001
   weight_decay: 0.001
 
-# Metrics
-metrics: null # mae, mre, rmse
+# Metrics for reconstruction quality evaluation
+metrics:
+  mae:
+    _target_: torchmetrics.MeanAbsoluteError
+  mse:
+    _target_: torchmetrics.MeanSquaredError
+    squared: false  # This gives RMSE instead of MSE
+  mape:
+    _target_: torchmetrics.MeanAbsolutePercentageError
 
 # Learning rate scheduler configuration
 scheduler:

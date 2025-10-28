@@ -2,15 +2,15 @@ _target_: src.model.mae.MaskedAutoencoder
 seq_len: ${segment_length}
 in_channels: 1
 patch_size: 10
-embed_dim: 124
+embed_dim: 512
 encoder_depth: 4
-encoder_num_heads: 8
-decoder_embed_dim: 124
+encoder_num_heads: 4
+decoder_embed_dim: 512
 decoder_depth: 4
-decoder_num_heads: 8
+decoder_num_heads: 4
 mlp_ratio: 4.0
 mask_ratio: 0.75
 dropout: 0.1
 loss_fn:
   _target_: src.model.loss.DefaultMAELoss
-  masked_weight: 1.0
+  masked_weight: 0.7

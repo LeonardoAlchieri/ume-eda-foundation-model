@@ -6,15 +6,15 @@ defaults:
   - engine: reconstruction
   - dataset: eda_default
   - dataloader: default
-  - logger: csv
+  - logger: wandb
   - callbacks: default
   - _self_
 
 # Experiment settings
 # Auto-generated from model, loss, and dataset
-segment_length_in_seconds: 60
+segment_length_in_seconds: 30
 sampling_rate: 4
-segment_length: 240
+segment_length: 120
 experiment_name: "${model._target_}__${model.loss_fn._target_}__${dataset.dataset_names}_${segment_length_in_seconds}s"
 seed: 600
 

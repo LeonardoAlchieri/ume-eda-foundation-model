@@ -1,0 +1,4 @@
+# Encoder-Decoder model configuration
+
+_target_: src.model.vae.VAEMedium
+in_dim: 120

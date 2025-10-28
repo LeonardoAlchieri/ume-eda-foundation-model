@@ -17,6 +17,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+from src.model.loss import DefaultMAELoss
+
 
 class PatchEmbedding(nn.Module):
     """
@@ -187,7 +189,8 @@ class MaskedAutoencoder(nn.Module):
         decoder_num_heads=8,
         mlp_ratio=4.0,
         mask_ratio=0.75,
-        dropout=0.1
+        dropout=0.1,
+        loss_fn=None,
     ):
         """
         Args:
@@ -203,6 +206,7 @@ class MaskedAutoencoder(nn.Module):
             mlp_ratio: Ratio of MLP hidden dim to embedding dim
             mask_ratio: Ratio of patches to mask (0.0 to 1.0)
             dropout: Dropout rate
+            loss_fn: Loss function module (defaults to DefaultMAELoss if None)
         """
         super().__init__()
         
@@ -213,6 +217,9 @@ class MaskedAutoencoder(nn.Module):
         self.in_channels = in_channels
         self.num_patches = seq_len // patch_size
         self.mask_ratio = mask_ratio
+        
+        # Loss function
+        self.loss_fn = loss_fn if loss_fn is not None else DefaultMAELoss()
         
         # Patch embedding
         self.patch_embed = PatchEmbedding(seq_len, patch_size, in_channels, embed_dim)
@@ -392,7 +399,7 @@ class MaskedAutoencoder(nn.Module):
     
     def loss(self, forward_output, batch, **kwargs):
         """
-        Compute MAE loss (MSE on masked patches only).
+        Compute MAE loss using the provided loss function.
         
         Args:
             forward_output: Tuple of (predictions, mask)
@@ -410,20 +417,15 @@ class MaskedAutoencoder(nn.Module):
             
         pred, mask = forward_output
         
-        # Patchify target
-        batch_size = x.shape[0]
-        target = x.reshape(
-            batch_size, self.num_patches, self.patch_size * self.in_channels
+        # Compute loss using the loss function
+        return self.loss_fn(
+            pred=pred,
+            target=x,
+            mask=mask,
+            patch_size=self.patch_size,
+            in_channels=self.in_channels,
+            num_patches=self.num_patches
         )
-        
-        # Compute loss only on masked patches
-        loss = (pred - target) ** 2
-        loss = loss.mean(dim=-1)  # Mean over patch dimension
-        
-        # Average loss only on removed (masked) patches
-        loss = (loss * mask).sum() / mask.sum()
-        
-        return loss
     
     def unpatchify(self, x):
         """

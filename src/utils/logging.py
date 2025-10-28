@@ -7,46 +7,6 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import Trainer
 
 
-def generate_experiment_name(cfg: DictConfig) -> str:
-    """
-    Generate an experiment name automatically from configuration components.
-    
-    Format: {engine}_{model}_{dataset}_{loss}
-    
-    Args:
-        cfg: Hydra/OmegaConf configuration object
-        
-    Returns:
-        Automatically generated experiment name string
-        
-    Example:
-        "ReconstructionEngine_MaskedAutoencoder_all_mse"
-    """
-    # Extract engine name from _target_
-    engine_target = cfg.get('engine', {}).get('_target_', 'engine')
-    engine_name = engine_target.split('.')[-1] if engine_target else 'engine'
-    
-    # Extract model name from _target_
-    model_target = cfg.get('model', {}).get('_target_', 'model')
-    model_name = model_target.split('.')[-1] if model_target else 'model'
-    
-    # Extract dataset info
-    dataset_names = cfg.get('dataset', {}).get('dataset_names', 'data')
-    if isinstance(dataset_names, list):
-        dataset_str = '_'.join(dataset_names)
-    else:
-        dataset_str = str(dataset_names)
-    
-    # Loss is typically hardcoded in models (e.g., MSE for reconstruction)
-    # We can infer it from the engine type
-    loss_name = 'mse'  # Default for reconstruction tasks
-    
-    # Construct experiment name
-    exp_name = f"{engine_name}_{model_name}_{dataset_str}_{loss_name}"
-    
-    return exp_name
-
-
 def log_hydra_config_to_lightning(trainer: Trainer, cfg: DictConfig) -> None:
     """
     Log the complete Hydra configuration to the Lightning logger.

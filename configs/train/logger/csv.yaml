@@ -1,6 +1,6 @@
 # CSV logger configuration
 
 _target_: pytorch_lightning.loggers.CSVLogger
-save_dir: ./logs
+save_dir: ./lightning_logs.nosync
 name: ${experiment_name}
 version: null

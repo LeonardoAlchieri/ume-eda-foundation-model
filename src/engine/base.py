@@ -1,20 +1,21 @@
-from typing import Any, Optional, Mapping, Type
+from typing import Any, Mapping, Optional, Type
 
+import pytorch_lightning as pl
 import torch
 from torch import nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchmetrics import Metric, MetricCollection
-import pytorch_lightning as pl
+
 
 class BaseSelfSupervisedEngine(pl.LightningModule):
     """
     Base PyTorch Lightning engine for self-supervised learning.
-    
+
     This engine requires models to implement a `loss(output, batch, step)` method
     for computing the loss.
     """
-    
+
     def __init__(
         self,
         model: nn.Module,
@@ -24,6 +25,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         scheduler: Optional[Type[_LRScheduler]] = None,
         scheduler_kwargs: Optional[Mapping[str, Any]] = None,
         data_augmentation: Optional[nn.Module] = None,
+        scaling_params: Optional[dict] = None,
     ):
         """
         Args:
@@ -44,9 +46,10 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         self.optimizer_kwargs = optimizer_kwargs or dict()
         self.scheduler_class = scheduler
         self.scheduler_kwargs = scheduler_kwargs or dict()
-        
+
         # Store data augmentation pipeline
         self.data_augmentation = data_augmentation
+        self.scaling_params = scaling_params
 
         # Setup metrics
         if metrics is None:
@@ -60,7 +63,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
     def predict(self, *args, **kwargs):
         """Prediction method."""
         return self.model(*args, **kwargs)
-    
+
     @staticmethod
     def _check_metric(metric):
         """Clone and reset a metric."""
@@ -69,40 +72,45 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         metric = metric.clone()
         metric.reset()
         return metric
-    
+
     def _set_metrics(self, metrics):
         """
         Setup metric collections for train/val/test splits.
-        
+
         Args:
             metrics: Dictionary of metric name -> Metric objects
         """
         # Create metric collections for each split
         valid_metrics = {k: v for k, v in metrics.items() if v is not None}
-        
+
         if valid_metrics:
             self.train_metrics = MetricCollection(
                 metrics={k: self._check_metric(m) for k, m in valid_metrics.items()},
-                prefix="train/"
+                prefix="train/",
             )
             self.val_metrics = MetricCollection(
                 metrics={k: self._check_metric(m) for k, m in valid_metrics.items()},
-                prefix="val/"
+                prefix="val/",
             )
             self.test_metrics = MetricCollection(
                 metrics={k: self._check_metric(m) for k, m in valid_metrics.items()},
-                prefix="test/"
+                prefix="test/",
             )
         else:
             self.train_metrics = None
             self.val_metrics = None
-            self.test_metrics = None      
+            self.test_metrics = None
 
     def log_metrics(self, metrics, **kwargs):
         """Log metrics to logger."""
         if metrics is not None:
             self.log_dict(
-                metrics, on_step=False, on_epoch=True, logger=True, prog_bar=True, **kwargs
+                metrics,
+                on_step=False,
+                on_epoch=True,
+                logger=True,
+                prog_bar=True,
+                **kwargs,
             )
 
     def log_loss(self, name, loss, **kwargs):
@@ -116,104 +124,117 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             prog_bar=True,
             **kwargs,
         )
-    
+
+    def apply_scaling(self, x: torch.Tensor) -> torch.Tensor:
+        if "mean" not in self.scaling_params or "std" not in self.scaling_params:
+            raise KeyError("scaling_params must contain 'mean' and 'std' keys.")
+        mean = self.scaling_params["mean"]
+        std = self.scaling_params["std"]
+        return (x - mean) / std
+
     def on_after_batch_transfer(self, batch, dataloader_idx):
         """
         Hook called after batch is transferred to device.
         Applies data augmentation and adds batch_size.
-        
+
         This method should be overridden by subclasses to implement
         specific augmentation strategies.
         """
         if isinstance(batch, dict):
             # Extract batch size from the batch
-            if 'x' in batch:
-                batch['batch_size'] = batch['x'].shape[0]
-            elif len(batch) > 0:
-                # Get batch size from first tensor in batch
-                first_value = next(iter(batch.values()))
-                if isinstance(first_value, torch.Tensor):
-                    batch['batch_size'] = first_value.shape[0]
+            if "x" in batch:
+                batch["batch_size"] = batch["x"].shape[0]
+                if self.scaling_params is not None:
+                    batch["x"] = self.apply_scaling(batch["x"])
+            else:
+                raise KeyError("Batch dictionary must contain key 'x' for input data.")
+        else:
+            raise TypeError(
+                "Batch must be a dictionary, with at least the 'x' key; got {}".format(
+                    type(batch)
+                )
+            )
+
         return batch
 
     def update_and_log_metrics(self, step, output, batch):
         """
         Update and log metrics for a given step (train/val/test).
-        
+
         Args:
             step: One of 'train', 'val', or 'test'
             output: Model output (dict or tensor)
             batch: Input batch dict
         """
         metric_collection = getattr(self, f"{step}_metrics", None)
-        
+
         if metric_collection is None:
             return
-        
+
         # If model provides method to extract predictions for metrics, use it
-        if hasattr(self.model, 'get_predictions_for_metrics'):
+        if hasattr(self.model, "get_predictions_for_metrics"):
             predictions, targets = self.model.get_predictions_for_metrics(output, batch)
             if predictions is not None and targets is not None:
                 metric_collection.update(predictions, targets)
-                batch_size = batch['batch_size']
+                batch_size = batch["batch_size"]
                 self.log_metrics(metric_collection, batch_size=batch_size)
 
     def shared_step(self, batch, step):
         """
         Shared step for train/val/test.
         Computes forward pass and loss using model's loss method.
-        
+
         Args:
             batch: Input batch
             step: One of 'train', 'val', or 'test'
-            
+
         Returns:
             Tuple of (loss, output)
         """
         # Forward pass through model
         output = self.forward(batch)
-        
+
         # Compute loss using model's loss method
         loss = self.model.loss(output, batch, step=step)
-        
+
         return loss, output
 
     def training_step(self, batch, batch_idx):
         """Training step."""
-        loss, output = self.shared_step(batch, step='train')
-        
+        loss, output = self.shared_step(batch, step="train")
+
         if torch.isnan(loss).any():
-            print(f'Warning: NaN loss at epoch {self.current_epoch}, batch {batch_idx}')
-        
+            print(f"Warning: NaN loss at epoch {self.current_epoch}, batch {batch_idx}")
+
         # Update metrics and log
         if output is not None:
             self.update_and_log_metrics("train", output, batch)
-        
-        batch_size = batch['batch_size']
+
+        batch_size = batch["batch_size"]
         self.log_loss("train", loss, batch_size=batch_size)
         return loss
 
     def validation_step(self, batch, batch_idx):
         """Validation step."""
-        val_loss, output = self.shared_step(batch, step='val')
-        
+        val_loss, output = self.shared_step(batch, step="val")
+
         # Update metrics and log
         if output is not None:
             self.update_and_log_metrics("val", output, batch)
-        
-        batch_size = batch['batch_size']
+
+        batch_size = batch["batch_size"]
         self.log_loss("val", val_loss, batch_size=batch_size)
         return val_loss
-    
+
     def test_step(self, batch, batch_idx):
         """Test step."""
-        test_loss, output = self.shared_step(batch, step='test')
-        
+        test_loss, output = self.shared_step(batch, step="test")
+
         # Update metrics and log
         if output is not None:
             self.update_and_log_metrics("test", output, batch)
-        
-        batch_size = batch['batch_size']
+
+        batch_size = batch["batch_size"]
         self.log_loss("test", test_loss, batch_size=batch_size)
         return test_loss
 
@@ -223,16 +244,18 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             # Compute and log final test metrics
             final_metrics = self.test_metrics.compute()
             for metric_name, value in final_metrics.items():
-                print(f"{metric_name}: {value.item() if isinstance(value, torch.Tensor) else value}")
+                print(
+                    f"{metric_name}: {value.item() if isinstance(value, torch.Tensor) else value}"
+                )
 
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
         cfg = dict()
-        
+
         # Create optimizer with stored class and kwargs
         optimizer = self.optimizer_class(self.parameters(), **self.optimizer_kwargs)
         cfg["optimizer"] = optimizer
-        
+
         # Setup scheduler if provided
         if self.scheduler_class is not None:
             scheduler_kwargs = self.scheduler_kwargs.copy()
@@ -241,5 +264,5 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             cfg["lr_scheduler"] = scheduler
             if metric is not None:
                 cfg["monitor"] = metric
-        
+
         return cfg

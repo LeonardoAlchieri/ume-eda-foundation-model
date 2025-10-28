@@ -195,6 +195,9 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         """
         if isinstance(batch, dict) and 'x' in batch:
             # Apply data augmentation to create two views only during training
+            if self.scaling_params is not None:
+                batch['x'] = self.apply_scaling(batch['x'])
+                    
             if self.data_augmentation is not None and self.training:
                 # Convert to numpy for augmentation
                 x = batch['x']

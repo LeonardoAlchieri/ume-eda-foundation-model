@@ -1,31 +1,23 @@
 from logging import getLogger
-from pathlib import Path
-from pprint import pprint
-from sys import path
-
 
 import hydra
 from hydra.utils import instantiate
-from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning import Trainer, seed_everything
+from omegaconf import DictConfig
 
 # set seeds for sklearn
-from sklearn.utils import check_random_state
 from torch.utils.data import DataLoader
 
-from src.utils.data import get_dataloder
+from src.utils.logging import log_hydra_config_to_lightning
 
 logger = getLogger(__name__)
 
 
 @hydra.main(
     config_path="./configs/train",
-    config_name="example_contrastive", # TODO: change config name
+    config_name="example_reconstruction",  # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):
-    # TODO: set the device!
-    # TODO: missing loss
 
     ##############################
     ####### DATASET SETUP ########
@@ -50,9 +42,16 @@ def main(cfg: DictConfig):
     #############################
     ####### MODELS SETUP ########
     #############################
-    engine = instantiate(cfg.engine)
+    engine = instantiate(
+        cfg.engine, scaling_params=instantiate(cfg.scaling_fun)(dataset=train_set)
+    )
 
     trainer = instantiate(cfg.trainer)
+
+    #############################
+    ### LOG HYDRA CONFIG ########
+    #############################
+    log_hydra_config_to_lightning(trainer, cfg)
 
     #############################
     ####### MODELS TRAIN ########

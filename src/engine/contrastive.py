@@ -33,6 +33,8 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         if isinstance(batch, dict) and 'x' in batch:
             # Apply data augmentation to create two views only during training
             if self.data_augmentation is not None and self.training:
+                if self.scaling_params is not None:
+                    batch['x'] = self.apply_scaling(batch['x'])
                 # Convert to numpy for augmentation
                 x = batch['x']
                 x_np = x.cpu().numpy()

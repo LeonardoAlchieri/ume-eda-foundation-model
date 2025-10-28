@@ -1,11 +1,8 @@
 # Weights & Biases logger configuration
 
 _target_: pytorch_lightning.loggers.WandbLogger
-project: eda-foundation-models
+project: cranberry-juicing
 name: ${experiment_name}
-save_dir: ./logs
+save_dir: ./wandb_logs
 log_model: false
-tags:
-  - self-supervised
-  - eda
-config: ${..}
+# config: ${..}

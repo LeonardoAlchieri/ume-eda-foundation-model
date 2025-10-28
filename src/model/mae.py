@@ -451,7 +451,9 @@ class MaskedAutoencoder(nn.Module):
             mask_ratio: Override default mask ratio (optional)
             
         Returns:
-            Reconstruction of shape (batch_size, seq_len, in_channels)
+            reconstruction: Reconstruction of shape (batch_size, seq_len, in_channels)
+            mask: Binary mask of shape (batch_size, num_patches) where 1 = masked, 0 = visible
         """
-        pred, _ = self.forward(x, mask_ratio)
-        return self.unpatchify(pred)
+        pred, mask = self.forward(x, mask_ratio)
+        reconstruction = self.unpatchify(pred)
+        return reconstruction, mask

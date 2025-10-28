@@ -43,10 +43,9 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         """Validation step with batch storage for plotting."""
         # Store first batch for plotting at epoch end
         if batch_idx == 0 and self.validation_batch_for_plotting is None:
-            # Store a detached copy of the batch
+            # Store a detached copy of the batch (only original, no augmentation during validation)
             self.validation_batch_for_plotting = {
                 'x': batch['x'].detach().cpu(),
-                'x_aug': batch['x_aug'].detach().cpu(),
             }
         
         # Call parent validation_step
@@ -55,7 +54,7 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
     def on_validation_epoch_end(self):
         """
         Hook called at the end of validation epoch.
-        Creates visualization plots of original, augmented, and reconstructed signals.
+        Creates visualization plots of original, masked, and reconstructed signals.
         """
         # Only plot if we have a stored batch
         if self.validation_batch_for_plotting is None:
@@ -64,51 +63,82 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         # Get the stored batch
         batch = self.validation_batch_for_plotting
         x_original = batch['x']
-        x_augmented = batch['x_aug']
         
         # Limit to plot_n_samples
         n_samples = min(self.plot_n_samples, x_original.shape[0])
         x_original = x_original[:n_samples]
-        x_augmented = x_augmented[:n_samples]
         
         # Move to device and get reconstructions
         device = next(self.model.parameters()).device
-        x_augmented_device = x_augmented.to(device)
+        x_original_device = x_original.to(device)
         
-        # Get reconstructions from model
+        # Get reconstructions and mask from model
         with torch.no_grad():
             self.model.eval()
-            reconstructed = self.model.reconstruct(x_augmented_device)
+            
+            # Check if model has reconstruct method that returns mask
+            if hasattr(self.model, 'reconstruct'):
+                result = self.model.reconstruct(x_original_device)
+                
+                # Handle different return types
+                if isinstance(result, tuple) and len(result) == 2:
+                    reconstructed, mask = result
+                    mask = mask.detach().cpu()
+                else:
+                    reconstructed = result
+                    mask = None
+            else:
+                # Fallback for models without reconstruct method
+                output = self.model.forward(x_original_device)
+                if isinstance(output, tuple):
+                    reconstructed = output[0]
+                else:
+                    reconstructed = output
+                mask = None
+            
             reconstructed = reconstructed.detach().cpu()
-            reconstructed = reconstructed.reshape(x_original.shape)
+            
+            # Reshape if needed
+            if reconstructed.shape != x_original.shape:
+                reconstructed = reconstructed.reshape(x_original.shape)
+        
+        # Get masked input if model supports it
+        masked_input = None
+        if mask is not None and hasattr(self.model, 'get_masked_input'):
+            with torch.no_grad():
+                masked_input = self.model.get_masked_input(x_original_device, mask)
+                masked_input = masked_input.detach().cpu()
         
         # Create plots
-        self._plot_reconstructions(x_original, x_augmented, reconstructed)
+        self._plot_reconstructions(x_original, reconstructed, mask, masked_input)
         
         # Clear the stored batch for next epoch
         self.validation_batch_for_plotting = None
     
-    def _plot_reconstructions(self, x_original, x_augmented, x_reconstructed):
+    def _plot_reconstructions(self, x_original, x_reconstructed, mask=None, masked_input=None):
         """
-        Create and log plots comparing original, augmented, and reconstructed signals.
+        Create and log overlay plots of original signal with masked regions and reconstruction.
         
         Args:
-            x_original: Original signals, shape (n_samples, T, C)
-            x_augmented: Augmented signals, shape (n_samples, T, C)
-            x_reconstructed: Reconstructed signals, shape (n_samples, T, C)
+            x_original: Original signals, shape (n_samples, T) or (n_samples, T, C)
+            x_reconstructed: Reconstructed signals, shape (n_samples, T) or (n_samples, T, C)
+            mask: Optional binary mask, shape (n_samples, num_patches) where 1 = masked, 0 = visible
+            masked_input: Optional masked input showing which patches were masked
         """
         n_samples = x_original.shape[0]
-        n_channels = x_original.shape[-1] if len(x_original.shape) == 3 else 1
         
         # Handle 2D case (N, T) -> (N, T, 1)
         if len(x_original.shape) == 2:
             x_original = x_original.unsqueeze(-1)
-            x_augmented = x_augmented.unsqueeze(-1)
             x_reconstructed = x_reconstructed.unsqueeze(-1)
+            if masked_input is not None:
+                masked_input = masked_input.unsqueeze(-1)
+        
+        n_channels = x_original.shape[-1]
         
         for sample_idx in range(n_samples):
-            # Create figure with subplots for each channel
-            fig, axes = plt.subplots(n_channels, 3, figsize=(15, 4 * n_channels))
+            # Create figure with two columns: original only (left) and overlay (right)
+            fig, axes = plt.subplots(n_channels, 2, figsize=(20, 4 * n_channels))
             
             # Handle single channel case
             if n_channels == 1:
@@ -117,34 +147,86 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
             for channel_idx in range(n_channels):
                 # Extract channel data
                 original_channel = x_original[sample_idx, :, channel_idx].numpy()
-                augmented_channel = x_augmented[sample_idx, :, channel_idx].numpy()
                 reconstructed_channel = x_reconstructed[sample_idx, :, channel_idx].numpy()
                 
-                # Plot original
-                axes[channel_idx, 0].plot(original_channel)
-                axes[channel_idx, 0].set_title(f'Original Signal (Ch {channel_idx})')
-                axes[channel_idx, 0].set_xlabel('Time')
-                axes[channel_idx, 0].set_ylabel('Value')
-                axes[channel_idx, 0].grid(True, alpha=0.3)
+                # Create time axis
+                time_steps = np.arange(len(original_channel))
                 
-                # Plot augmented
-                axes[channel_idx, 1].plot(augmented_channel)
-                axes[channel_idx, 1].set_title(f'Augmented Signal (Ch {channel_idx})')
-                axes[channel_idx, 1].set_xlabel('Time')
-                axes[channel_idx, 1].set_ylabel('Value')
-                axes[channel_idx, 1].grid(True, alpha=0.3)
+                # === LEFT PLOT: Original Signal Only ===
+                ax_orig = axes[channel_idx, 0]
                 
-                # Plot reconstructed
-                axes[channel_idx, 2].plot(reconstructed_channel)
-                axes[channel_idx, 2].set_title(f'Reconstructed Signal (Ch {channel_idx})')
-                axes[channel_idx, 2].set_xlabel('Time')
-                axes[channel_idx, 2].set_ylabel('Value')
-                axes[channel_idx, 2].grid(True, alpha=0.3)
+                ax_orig.plot(time_steps, original_channel, 
+                           color='blue', linewidth=2, alpha=0.8)
+                
+                title_orig = f'Original Signal'
+                if n_channels > 1:
+                    title_orig += f' (Channel {channel_idx})'
+                ax_orig.set_title(title_orig, fontsize=13, fontweight='bold')
+                ax_orig.set_xlabel('Time Step', fontsize=11)
+                ax_orig.set_ylabel('Value', fontsize=11)
+                ax_orig.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+                
+                # === RIGHT PLOT: Overlay with Masking and Reconstruction ===
+                ax_overlay = axes[channel_idx, 1]
+                
+                # Highlight masked regions if mask is available
+                if mask is not None and hasattr(self.model, 'patch_size'):
+                    patch_size = self.model.patch_size
+                    num_patches = self.model.num_patches
+                    sample_mask = mask[sample_idx].numpy()  # (num_patches,)
+                    
+                    # Shade masked patches
+                    for patch_idx in range(num_patches):
+                        if sample_mask[patch_idx] == 1:  # Masked patch
+                            start_idx = patch_idx * patch_size
+                            end_idx = (patch_idx + 1) * patch_size
+                            ax_overlay.axvspan(start_idx, end_idx, alpha=0.25, color='red', 
+                                     label='Masked Region' if patch_idx == sample_mask.argmax() else '')
+                
+                # Plot original signal (semi-transparent blue)
+                ax_overlay.plot(time_steps, original_channel, 
+                       label='Original', color='blue', linewidth=2.5, alpha=0.6, zorder=1)
+                
+                # Plot masked input if available (dashed orange)
+                if masked_input is not None:
+                    masked_channel = masked_input[sample_idx, :, channel_idx].numpy()
+                    # Only plot non-zero parts to show visible patches
+                    visible_mask = masked_channel != 0
+                    if visible_mask.any():
+                        ax_overlay.plot(time_steps[visible_mask], masked_channel[visible_mask], 
+                               label='Visible Input', color='orange', linewidth=1.5, 
+                               alpha=0.7, linestyle=':', marker='.', markersize=3, zorder=2)
+                
+                # Plot reconstruction on top (solid green)
+                ax_overlay.plot(time_steps, reconstructed_channel, 
+                       label='Reconstruction', color='green', linewidth=2.5, alpha=0.9, zorder=3)
+                
+                # Formatting for overlay plot
+                title_overlay = f'Reconstruction Overlay'
+                if n_channels > 1:
+                    title_overlay += f' (Channel {channel_idx})'
+                ax_overlay.set_title(title_overlay, fontsize=13, fontweight='bold')
+                ax_overlay.set_xlabel('Time Step', fontsize=11)
+                ax_overlay.set_ylabel('Value', fontsize=11)
+                
+                # Create legend with unique labels only
+                handles, labels = ax_overlay.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                ax_overlay.legend(by_label.values(), by_label.keys(), loc='best', fontsize=10, framealpha=0.9)
+                
+                ax_overlay.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+                
+                # Add text annotation with reconstruction quality
+                mse = np.mean((original_channel - reconstructed_channel) ** 2)
+                ax_overlay.text(0.02, 0.98, f'MSE: {mse:.4f}', 
+                       transform=ax_overlay.transAxes, fontsize=9,
+                       verticalalignment='top', bbox=dict(boxstyle='round', 
+                       facecolor='wheat', alpha=0.5))
             
             plt.tight_layout()
             
             # Log figure using Lightning's logger
-            self._log_figure(fig, f'reconstruction_sample_{sample_idx}')
+            self._log_figure(fig, f'reconstruction_overlay_sample_{sample_idx}')
             
             plt.close(fig)
     

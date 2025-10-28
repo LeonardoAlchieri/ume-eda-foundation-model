@@ -2,11 +2,11 @@ _target_: src.model.mae.MaskedAutoencoder
 seq_len: ${segment_length}
 in_channels: 1
 patch_size: 10
-embed_dim: 256
-encoder_depth: 6
+embed_dim: 124
+encoder_depth: 4
 encoder_num_heads: 8
-decoder_embed_dim: 256
-decoder_depth: 6
+decoder_embed_dim: 124
+decoder_depth: 4
 decoder_num_heads: 8
 mlp_ratio: 4.0
 mask_ratio: 0.75

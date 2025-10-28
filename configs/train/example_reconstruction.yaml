@@ -12,9 +12,9 @@ defaults:
 
 # Experiment settings
 # Auto-generated from model, loss, and dataset
-segment_length_in_seconds: 30
+segment_length_in_seconds: 60
 sampling_rate: 4
-segment_length: 120
+segment_length: 240
 experiment_name: "${model._target_}__${model.loss_fn._target_}__${dataset.dataset_names}_${segment_length_in_seconds}s"
 seed: 600
 
@@ -26,8 +26,8 @@ save_final_checkpoint: true
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 400
-  accelerator: mps
-  devices: auto
+  accelerator: cuda
+  devices: [1]
   log_every_n_steps: 10
   deterministic: false
   gradient_clip_val: 1.0

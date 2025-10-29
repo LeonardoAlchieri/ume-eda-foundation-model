@@ -254,7 +254,7 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
             plt.tight_layout()
 
             # Log figure using Lightning's logger
-            self._log_figure(fig, f"reconstruction_overlay_sample_{sample_idx}")
+            self._log_figure(fig, f"reconstruction_overlay_sample")
 
             plt.close(fig)
 

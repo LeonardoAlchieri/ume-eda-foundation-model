@@ -4,5 +4,5 @@ _target_: pytorch_lightning.loggers.WandbLogger
 project: cranberry-juicing
 name: ${experiment_name}
 save_dir: ./wandb_logs
-log_model: false
+log_model: true  # Enable model checkpoint logging
 # config: ${..}

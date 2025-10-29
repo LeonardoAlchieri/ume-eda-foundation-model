@@ -19,6 +19,7 @@ This repository contains the official implementation of self-supervised learning
 - [Repository Structure](#repository-structure)
 - [Training](#training)
 - [Evaluation](#evaluation)
+- [Inference API](#inference-api)
 - [Configuration](#configuration)
 - [Data](#data)
 - [Models](#models)
@@ -332,6 +333,154 @@ python train.py --config-name=example_contrastive \
 ```
 
 The trainer will automatically evaluate on the test set after training.
+
+---
+
+## 🚀 Inference API
+
+### EdamamePipeline: Easy Model Inference
+
+The `EdamamePipeline` provides a simple and intuitive API for loading pretrained models and extracting embeddings from time series data.
+
+#### Quick Start
+
+```python
+from src.pipeline import EdamamePipeline
+import torch
+
+# Load a pretrained model
+pipeline = EdamamePipeline.from_pretrained(
+    model_name="mae",
+    weights_path="checkpoints/best.ckpt",
+    model_config="configs/train/model/mae.yaml",
+    device_map="auto",  # Automatically use GPU if available
+)
+
+# Prepare your data (batch_size, seq_len, in_channels)
+batch_data = torch.randn(8, 240, 1)
+
+# Extract embeddings
+embeddings = pipeline.embed(batch_data)
+print(f"Embeddings shape: {embeddings.shape}")
+# Output: torch.Size([8, 24, 512])
+
+# Access single sample
+single_embedding = pipeline.embed(batch_data)[0]
+print(f"Single embedding: {single_embedding.shape}")
+```
+
+#### Loading Models
+
+The API supports multiple ways to load models:
+
+```python
+# Method 1: With YAML config file
+pipeline = EdamamePipeline.from_pretrained(
+    model_name="mae",
+    weights_path="checkpoints/best.ckpt",
+    model_config="configs/train/model/mae.yaml",
+    device_map="auto",
+)
+
+# Method 2: With config dictionary
+config = {
+    "seq_len": 240,
+    "in_channels": 1,
+    "patch_size": 10,
+    "embed_dim": 512,
+    # ... other parameters
+}
+pipeline = EdamamePipeline.from_pretrained(
+    model_name="mae",
+    weights_path="checkpoints/best.ckpt",
+    model_config=config,
+)
+
+# Method 3: Auto-infer from checkpoint
+pipeline = EdamamePipeline.from_pretrained(
+    model_name="mae",
+    weights_path="checkpoints/best.ckpt",
+    model_config=None,  # Will infer from checkpoint
+)
+```
+
+#### Embedding Extraction
+
+```python
+# Extract embeddings without masking (full signal)
+embeddings = pipeline.embed(batch_data, mask_ratio=0.0)
+
+# Extract embeddings with masking (like during training)
+embeddings_masked = pipeline.embed(batch_data, mask_ratio=0.75)
+
+# Get embeddings with mask information
+embeddings, mask, ids_restore = pipeline.embed(
+    batch_data,
+    mask_ratio=0.75,
+    return_mask=True
+)
+```
+
+#### Signal Reconstruction
+
+```python
+# Reconstruct signal with masking
+reconstructed = pipeline.reconstruct(batch_data, mask_ratio=0.75)
+
+# Compute reconstruction error
+mse = torch.mean((batch_data - reconstructed) ** 2)
+print(f"MSE: {mse.item():.6f}")
+```
+
+#### Batch Processing
+
+```python
+from torch.utils.data import DataLoader
+
+all_embeddings = []
+for batch in dataloader:
+    embeddings = pipeline.embed(batch)
+    all_embeddings.append(embeddings.cpu())
+
+# Concatenate all embeddings
+all_embeddings = torch.cat(all_embeddings, dim=0)
+```
+
+#### Device Management
+
+```python
+# CPU only
+pipeline = EdamamePipeline.from_pretrained(..., device_map="cpu")
+
+# GPU (automatic selection)
+pipeline = EdamamePipeline.from_pretrained(..., device_map="auto")
+
+# Specific GPU
+pipeline = EdamamePipeline.from_pretrained(..., device_map="cuda:0")
+
+# Half precision for memory efficiency
+pipeline = EdamamePipeline.from_pretrained(
+    ...,
+    device_map="auto",
+    torch_dtype=torch.float16
+)
+```
+
+#### Complete Examples
+
+See the comprehensive examples:
+- **API Documentation**: [`src/pipeline/README.md`](src/pipeline/README.md)
+- **Example Scripts**: [`examples/pipeline_usage.py`](examples/pipeline_usage.py)
+- **Quick Test**: `python test_pipeline_quick.py`
+
+#### Supported Models
+
+Currently supported:
+- ✅ **MAE (Masked Autoencoder)**: Self-supervised reconstruction model
+
+Coming soon:
+- 🔜 VAE (Variational Autoencoder)
+- 🔜 Contrastive models
 
 ---
 

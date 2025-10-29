@@ -4,7 +4,6 @@ import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-# set seeds for sklearn
 from torch.utils.data import DataLoader
 
 from src.utils.logging import log_hydra_config_to_lightning

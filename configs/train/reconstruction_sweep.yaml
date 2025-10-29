@@ -68,6 +68,6 @@ hydra:
     dir: "outputs/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     subdir: "${hydra:runtime.choices.model}-${hydra:runtime.choices.feature_extractor}-${hydra:runtime.choices.aggregator}-${hydra:runtime.choices.validation_method}-${label_name}-${seed}"
   sweeper:
-    grid_params: 
+    params: 
       seed: 42
       model.loss_fn.masked_weight: 1.0, 0.9, 0.8, 0.7, 0.6

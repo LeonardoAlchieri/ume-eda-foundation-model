@@ -2,7 +2,7 @@
 # Run with: python train.py --config-name=example_reconstruction
 
 defaults:
-  - model: mae
+  - model: mae_standardized
   - engine: reconstruction
   - dataset: eda_default
   - dataloader: default
@@ -58,12 +58,12 @@ engine:
     eta_min: 0.00001
 
 scaling_fun:
-  _target_: edamame.utils.data.get_standard_scaling_params
+  _target_: edamame.utils.data.get_emptyget_empty_scaling_params
   _partial_: true
 
 
 hydra:
-  mode: MULTIRUN
+  mode: RUN
   sweep:
     dir: "outputs/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     subdir: "${model.loss_fn.masked_weight}-${seed}"

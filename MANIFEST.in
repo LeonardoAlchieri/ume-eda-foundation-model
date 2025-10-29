@@ -4,7 +4,7 @@ include pyproject.toml
 include GETTING_STARTED.md
 include PIPELINE_IMPLEMENTATION.md
 
-recursive-include src *.py
+recursive-include edamame *.py
 recursive-include configs *.yaml
 
 exclude train.py

@@ -206,7 +206,7 @@ eda-foundation-models/
 │       ├── engine/            # Training engine configs
 │       ├── logger/            # Logger configs
 │       └── model/             # Model architecture configs
-├── src/
+├── edamame/
 │   ├── data/
 │   │   ├── dataset.py        # Dataset implementation
 │   │   └── __init__.py
@@ -500,7 +500,7 @@ pipeline = EdamamePipeline.from_pretrained(
 #### Complete Examples
 
 See the comprehensive examples:
-- **API Documentation**: [`src/pipeline/README.md`](src/pipeline/README.md)
+- **API Documentation**: [`edamame/pipeline/README.md`](edamame/pipeline/README.md)
 - **Example Scripts**: [`examples/pipeline_usage.py`](examples/pipeline_usage.py)
 - **Quick Test**: `python test_pipeline_quick.py`
 
@@ -664,7 +664,7 @@ dataset_names:
 
 ### Data Preprocessing
 
-The [`EDAtaNoLabel`](src/data/dataset.py) class handles:
+The [`EDAtaNoLabel`](edamame/data/dataset.py) class handles:
 - ✅ Loading and concatenation of multiple `.npy` files
 - ✅ Channel selection (single or multiple channels)
 - ✅ Train/validation/test splitting
@@ -690,7 +690,7 @@ channels: null
 
 ### Contrastive Learning Model
 
-**Architecture**: [`src/model/matton_constrastive.py`](src/model/matton_constrastive.py)
+**Architecture**: [`edamame/model/matton_constrastive.py`](edamame/model/matton_constrastive.py)
 
 ```
 Input (N, T, C)
@@ -713,7 +713,7 @@ NCE Loss (between x_1 and x_2)
 
 ### Encoder-Decoder Model
 
-**Architecture**: [`src/model/encoder_decoder.py`](src/model/encoder_decoder.py)
+**Architecture**: [`edamame/model/encoder_decoder.py`](edamame/model/encoder_decoder.py)
 
 ```
 Input (N, T, C)
@@ -842,7 +842,7 @@ pytest tests/test_engine.py -v
 pytest tests/test_engine.py::TestContrastiveEngineAugmentation::test_augmentation_2d_training -v
 
 # Run with coverage
-pytest tests/ --cov=src --cov-report=html
+pytest tests/ --cov=edamame --cov-report=html
 ```
 
 ### Test Coverage
@@ -1022,7 +1022,7 @@ pre-commit install
 pytest tests/
 
 # Format code
-black src/ tests/
+black edamame/ tests/
 ```
 
 ### Code Style

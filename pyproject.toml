@@ -63,10 +63,10 @@ Repository = "https://github.com/LeonardoAlchieri/eda-foundation-models"
 Documentation = "https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/README.md"
 
 [tool.setuptools]
-packages = ["src"]
+packages = ["edamame"]
 
 [tool.setuptools.package-data]
-src = ["py.typed"]
+edamame = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

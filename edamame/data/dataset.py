@@ -48,7 +48,7 @@ class EDAtaNoLabel(Dataset):
         train_val_test_size: Optional[tuple] = None,
         seed: Optional[int] = None,
         channels: Optional[Union[int, List[int]]] = None,
-        z_norm: bool = False,
+        sample_scaling_method: Optional[callable] = None,
     ):
         """Initialize the dataset."""
         self.base_path = Path(base_path)
@@ -56,7 +56,7 @@ class EDAtaNoLabel(Dataset):
         self.shuffle = shuffle
         self.seed = seed
         self.channels = channels
-        self.z_norm = z_norm
+        self.sample_scaling_method = sample_scaling_method
 
         # Load all data
         self.data = self._load_data()
@@ -170,12 +170,14 @@ class EDAtaNoLabel(Dataset):
                 concatenated_data = concatenated_data[..., 0]
                 logger.info(f"Squeezed single channel, new shape: {concatenated_data.shape}")
                 
-        if self.z_norm:
-            # Apply z-normalization per sample
-            means = np.mean(concatenated_data, axis=1, keepdims=True)
-            stds = np.std(concatenated_data, axis=1, keepdims=True) + 1e-8  # avoid division by zero
-            concatenated_data = (concatenated_data - means) / stds
-            logger.info(f"Applied z-normalization to data")
+        if self.sample_scaling_method is not None:
+            concatenated_data = self.sample_scaling_method(concatenated_data)
+            
+            # # Apply z-normalization per sample
+            # means = np.mean(concatenated_data, axis=1, keepdims=True)
+            # stds = np.std(concatenated_data, axis=1, keepdims=True) + 1e-8  # avoid division by zero
+            # concatenated_data = (concatenated_data - means) / stds
+            # logger.info(f"Applied z-normalization to data")
                 
         logger.info(f"Concatenated data shape: {concatenated_data.shape}")
 

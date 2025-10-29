@@ -1,6 +1,6 @@
 # Default callbacks configuration
 - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-  dirpath: ./checkpoints.nosync
+  dirpath: ./checkpoints.nosync/${experiment_name}
   filename: "{epoch:02d}-{val_loss:.4f}"
   monitor: val_loss
   mode: min

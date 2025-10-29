@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 
 from torch.utils.data import DataLoader
 
-from src.utils.logging import log_hydra_config_to_lightning
+from edamame.utils.logging import log_hydra_config_to_lightning
 
 logger = getLogger(__name__)
 

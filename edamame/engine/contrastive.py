@@ -6,7 +6,7 @@ import torch
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for server environments
 
-from src.engine.base import BaseSelfSupervisedEngine
+from edamame.engine.base import BaseSelfSupervisedEngine
 
 
 

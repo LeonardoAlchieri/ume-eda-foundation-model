@@ -7,8 +7,8 @@ import numpy as np
 import torch
 from torch import nn
 
-from src.engine import ContrastiveEngine, ReconstructionEngine
-from src.model.matton_constrastive import ContrastiveModel
+from edamame.engine import ContrastiveEngine, ReconstructionEngine
+from edamame.model.matton_constrastive import ContrastiveModel
 
 
 class DummyAugmentation:

@@ -7,9 +7,9 @@ This module provides PyTorch Lightning engines for different SSL paradigms:
 - ContrastiveEngine: For contrastive learning (SimCLR, etc.)
 """
 
-from src.engine.base import BaseSelfSupervisedEngine
-from src.engine.reconstruction import ReconstructionEngine
-from src.engine.contrastive import ContrastiveEngine
+from edamame.engine.base import BaseSelfSupervisedEngine
+from edamame.engine.reconstruction import ReconstructionEngine
+from edamame.engine.contrastive import ContrastiveEngine
 
 __all__ = [
     "BaseSelfSupervisedEngine",

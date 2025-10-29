@@ -1,6 +1,6 @@
 """EDA Foundation Models package."""
 
-from src.pipeline import EdamamePipeline
+from edamame.pipeline import EdamamePipeline
 
 __all__ = ["EdamamePipeline"]
 

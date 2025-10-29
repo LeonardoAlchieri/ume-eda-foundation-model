@@ -197,7 +197,7 @@ class EdamamePipeline:
         Returns:
             Loaded MAE model
         """
-        from src.model.mae import MaskedAutoencoder
+        from edamame.model.mae import MaskedAutoencoder
 
         # Extract state dict - handle different checkpoint formats
         if "state_dict" in checkpoint:

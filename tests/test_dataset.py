@@ -11,7 +11,7 @@ import torch
 from pathlib import Path
 import tempfile
 import shutil
-from src.data.dataset import EDAtaNoLabel
+from edamame.data.dataset import EDAtaNoLabel
 
 
 @pytest.fixture

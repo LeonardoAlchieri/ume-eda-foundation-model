@@ -67,40 +67,66 @@ This codebase provides a modular framework for self-supervised learning on EDA s
 - CUDA 11.0+ (optional, for GPU support)
 - 8GB+ RAM (16GB+ recommended for large datasets)
 
-### Environment Setup
+### Quick Install (Recommended)
 
-We recommend using `mamba` or `conda` for environment management:
+Install the package with pip:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/eda-foundation-models.git
+git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
 cd eda-foundation-models
 
+# Install in editable mode (recommended for development)
+pip install -e .
+
+# Or install with all optional dependencies
+pip install -e ".[all]"
+```
+
+### Environment Setup (Alternative)
+
+Using `mamba` or `conda` for environment management:
+
+```bash
 # Create and activate environment
 mamba create -n eda-foundation-models python=3.8
 mamba activate eda-foundation-models
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the package
+pip install -e .
 ```
 
-### Dependencies
+### Optional Dependencies
 
-Core dependencies include:
-```
-pytorch>=2.0.0
-pytorch-lightning>=2.0.0
-hydra-core>=1.3.0
-torchmetrics>=0.11.0
-numpy>=1.23.0
-scipy>=1.10.0
-scikit-learn>=1.2.0
-```
+The package supports optional dependency groups:
 
-For development and testing:
 ```bash
-pip install -r requirements-dev.txt  # includes pytest, black, etc.
+# Development tools (pytest, black, flake8, etc.)
+pip install -e ".[dev]"
+
+# Signal processing (neurokit2)
+pip install -e ".[signal]"
+
+# Jupyter notebooks (jupyter, matplotlib)
+pip install -e ".[notebook]"
+
+# All optional dependencies
+pip install -e ".[all]"
 ```
+
+### Core Dependencies
+
+The package automatically installs:
+- pytorch>=2.0.0
+- pytorch-lightning>=2.0.0
+- hydra-core>=1.3.0
+- torchmetrics>=0.11.0
+- numpy>=1.23.0
+- scipy>=1.10.0
+- scikit-learn>=1.2.0
+- pyyaml>=6.0
+
+See [INSTALL.md](INSTALL.md) for detailed installation instructions.
 
 ### Verification
 
@@ -110,7 +136,12 @@ Verify your installation:
 python verify_setup.py
 ```
 
-This will check all dependencies and attempt to instantiate the models and engines.
+Or test the inference API:
+
+```python
+from edamamepipeline import EdamamePipeline
+print("✓ Installation successful!")
+```
 
 ---
 
@@ -309,7 +340,7 @@ Configure in [`configs/train/logger/wandb.yaml`](configs/train/logger/wandb.yaml
 ### Loading Trained Models
 
 ```python
-from src.engine import ContrastiveEngine
+from edamameengine import ContrastiveEngine
 import torch
 
 # Load checkpoint
@@ -345,7 +376,7 @@ The `EdamamePipeline` provides a simple and intuitive API for loading pretrained
 #### Quick Start
 
 ```python
-from src.pipeline import EdamamePipeline
+from edamamepipeline import EdamamePipeline
 import torch
 
 # Load a pretrained model
@@ -523,27 +554,27 @@ trainer:
 #### Model Configuration
 [`configs/train/model/contrastive_mutton.yaml`](configs/train/model/contrastive_mutton.yaml):
 ```yaml
-_target_: src.model.matton_constrastive.ContrastiveModel
+_target_: edamamemodel.matton_constrastive.ContrastiveModel
 
 encoder_net:
-  _target_: src.model.nn.cnn_encoder.CNNEncoder
+  _target_: edamamemodel.nn.cnn_encoder.CNNEncoder
   input_dim: 120
   output_dim: 64
 
 transform_head:
-  _target_: src.model.nn.linear_net.LinearNN
+  _target_: edamamemodel.nn.linear_net.LinearNN
   input_dim: 64
   output_dim: 32
 
 loss_fn:
-  _target_: src.model.loss.contrastive.NCELoss
+  _target_: edamamemodel.loss.contrastive.NCELoss
   temperature: 0.1
 ```
 
 #### Engine Configuration
 [`configs/train/engine/contrastive.yaml`](configs/train/engine/contrastive.yaml):
 ```yaml
-_target_: src.engine.ContrastiveEngine
+_target_: edamameengine.ContrastiveEngine
 
 optimizer:
   _target_: torch.optim.Adam
@@ -563,7 +594,7 @@ data_augmentation:
 #### Dataset Configuration
 [`configs/train/dataset/eda_default.yaml`](configs/train/dataset/eda_default.yaml):
 ```yaml
-_target_: src.data.dataset.EDAtaNoLabel
+_target_: edamamedata.dataset.EDAtaNoLabel
 base_path: ./data.nosync
 dataset_names: all  # or ['USILaughs', 'WESAD']
 shuffle: true
@@ -622,7 +653,7 @@ data/
 Configure in [`configs/train/dataset/eda_default.yaml`](configs/train/dataset/eda_default.yaml):
 
 ```yaml
-_target_: src.data.dataset.EDAtaNoLabel
+_target_: edamamedata.dataset.EDAtaNoLabel
 base_path: ./data
 dataset_names: 
   - USILaughs

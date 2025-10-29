@@ -7,8 +7,8 @@ import torch
 import tempfile
 from pathlib import Path
 
-from src.pipeline import EdamamePipeline
-from src.model.mae import MaskedAutoencoder
+from edamame.pipeline import EdamamePipeline
+from edamame.model.mae import MaskedAutoencoder
 
 
 class TestEdamamePipeline:

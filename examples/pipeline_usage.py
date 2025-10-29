@@ -9,7 +9,7 @@ import torch
 import numpy as np
 from pathlib import Path
 
-from src.pipeline import EdamamePipeline
+from edamame.pipeline import EdamamePipeline
 
 
 def example_basic_usage():

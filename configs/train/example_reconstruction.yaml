@@ -58,5 +58,5 @@ engine:
     eta_min: 0.00001
 
 scaling_fun:
-  _target_: src.utils.data.get_empty_scaling_params
+  _target_: edamame.utils.data.get_empty_scaling_params
   _partial_: true

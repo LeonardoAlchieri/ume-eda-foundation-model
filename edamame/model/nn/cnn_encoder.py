@@ -5,7 +5,7 @@ Class for basic CNN encoder.
 import torch.nn as nn
 import torch
 
-from src.utils import get_conv1d_output_dim, get_maxpool1d_output_dim
+from edamame.utils import get_conv1d_output_dim, get_maxpool1d_output_dim
 
 
 class CNNEncoder(nn.Module):

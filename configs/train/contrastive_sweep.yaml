@@ -31,8 +31,8 @@ save_final_checkpoint: true
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 400
-  accelerator: auto
-  devices: auto
+  accelerator: cuda
+  devices: [0]
   log_every_n_steps: 10
   deterministic: false
   gradient_clip_val: 1.0
@@ -41,8 +41,8 @@ trainer:
   logger: ${logger}
   check_val_every_n_epoch: 1
   callbacks: ${callbacks}
-  fast_dev_run: 10
-  profiler: simple
+  # fast_dev_run: 10
+  # profiler: simple
 
 # Override dataloader settings
 dataloader:

@@ -19,14 +19,15 @@ experiment_name: "${model._target_}__${model.loss_fn._target_}__${dataset.datase
 seed: 600
 
 dataset:
+  channels: 1
   sample_scaling_method: 
     _target_: edamame.utils.sample_scaling.mean_scaling
     _partial_: true
 
 model:
-  mask_ratio: 0.0
+  mask_ratio: 0.75
   loss_fn:
-    masked_weight: 0.0
+    masked_weight: 0.9
 
 
 # Save configuration

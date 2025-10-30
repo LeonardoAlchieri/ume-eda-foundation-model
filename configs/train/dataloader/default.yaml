@@ -1,7 +1,6 @@
 # Default dataloader configuration
 
 batch_size: 64
-shuffle: true
 num_workers: 10
 pin_memory: true
 drop_last: true

@@ -27,14 +27,17 @@ def main(cfg: DictConfig):
 
     train_loader = DataLoader(
         train_set,
+        shuffle=True,
         **cfg.dataloader,
     )
     val_loader = DataLoader(
         val_set,
+        shuffle=False,
         **cfg.dataloader,
     )
     test_loader = DataLoader(
         test_set,
+       shuffle=False, 
         **cfg.dataloader,
     )
 

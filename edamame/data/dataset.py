@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, random_split
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class EDAtaNoLabel(Dataset):
         train_val_test_size: Optional[tuple] = None,
         seed: Optional[int] = None,
         channels: Optional[Union[int, List[int]]] = None,
-        sample_scaling_method: Optional[callable] = None,
+        sample_scaling_method: Optional[Callable] = None,
     ):
         """Initialize the dataset."""
         self.base_path = Path(base_path)

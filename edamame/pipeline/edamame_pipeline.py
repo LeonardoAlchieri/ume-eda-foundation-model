@@ -6,7 +6,7 @@ for embedding extraction and inference tasks.
 """
 
 from pathlib import Path
-from typing import Dict, Optional, Union, Any
+from typing import Dict, Optional, Union, Any, Callable
 import torch
 import torch.nn as nn
 from omegaconf import DictConfig, OmegaConf
@@ -21,6 +21,7 @@ class EdamamePipeline:
     and extract embeddings from input time series data.
 
     Example:
+        >>> # Example with default (no normalization)
         >>> pipeline = EdamamePipeline.from_pretrained(
         ...     model_name="mae",
         ...     weights_path="checkpoints/best.ckpt",
@@ -28,6 +29,19 @@ class EdamamePipeline:
         ...     device_map="auto",
         ... )
         >>> embeddings = pipeline.embed(batch_data)
+        >>> 
+        >>> # Example with custom normalization function
+        >>> def z_normalize(x):
+        ...     mean = x.mean(dim=1, keepdim=True)
+        ...     std = x.std(dim=1, unbiased=False, keepdim=True)
+        ...     return (x - mean) / (std + 1e-8)
+        >>> 
+        >>> pipeline = EdamamePipeline.from_pretrained(
+        ...     model_name="mae",
+        ...     weights_path="checkpoints/best.ckpt",
+        ...     normalization_fn=z_normalize,
+        ...     device_map="auto",
+        ... )
     """
 
     def __init__(
@@ -35,7 +49,7 @@ class EdamamePipeline:
         model: nn.Module,
         model_name: str,
         device: torch.device,
-        z_norm_input: bool = False,
+        normalization_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         model_config: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -45,18 +59,20 @@ class EdamamePipeline:
             model: The loaded model
             model_name: Name of the model architecture
             device: Device to run inference on
+            normalization_fn: Optional normalization function to apply to inputs.
+                            Should accept a torch.Tensor and return a torch.Tensor.
+                            If None, no normalization is applied.
             model_config: Model configuration dictionary
         """
         self.model = model
         self.model_name = model_name
         self.device = device
         self.model_config = model_config or {}
+        self.normalization_fn = normalization_fn
 
         # Set model to evaluation mode
         self.model.eval()
         self.model.to(self.device)
-
-        self.z_norm_input = z_norm_input
 
     @classmethod
     def from_pretrained(
@@ -66,13 +82,13 @@ class EdamamePipeline:
         model_config: Optional[Union[str, Path, Dict, DictConfig]] = None,
         device_map: str = "auto",
         torch_dtype: Optional[torch.dtype] = None,
-        z_norm_input: bool = False,
+        normalization_fn: Optional[Callable] = None,
     ) -> "EdamamePipeline":
         """
         Load a pretrained model from checkpoint.
 
         Args:
-            model_name: Name of the model architecture (e.g., "mae", "vae")
+            model_name: Name of the model architecture (e.g., "mae", "efficientnet")
             weights_path: Path to the checkpoint file (.ckpt)
             model_config: Path to model config file or config dict.
                          If None, will try to extract from checkpoint.
@@ -82,6 +98,10 @@ class EdamamePipeline:
                        - "cuda": use GPU
                        - "cuda:0": use specific GPU
             torch_dtype: Data type for model parameters (e.g., torch.float32, torch.float16)
+            normalization_fn: Optional normalization function to apply to inputs.
+                            Should accept a torch.Tensor and return a torch.Tensor.
+                            If None, no normalization is applied.
+                            Example: lambda x: (x - x.mean(dim=1, keepdim=True)) / (x.std(dim=1, keepdim=True) + 1e-8)
 
         Returns:
             EdamamePipeline instance ready for inference
@@ -108,9 +128,11 @@ class EdamamePipeline:
         # Build model based on model_name
         if model_name.lower() == "mae":
             model = cls._load_mae_model(config_dict, checkpoint, torch_dtype)
+        elif model_name.lower() == "efficientnet":
+            model = cls._load_efficientnet_model(config_dict, checkpoint, torch_dtype)
         else:
             raise ValueError(
-                f"Model '{model_name}' not supported. Currently only 'mae' is supported."
+                f"Model '{model_name}' not supported. Currently supported: 'mae', 'efficientnet'."
             )
 
         # Create pipeline instance
@@ -119,7 +141,7 @@ class EdamamePipeline:
             model_name=model_name,
             device=device,
             model_config=config_dict,
-            z_norm_input=z_norm_input,
+            normalization_fn=normalization_fn,
         )
 
     @staticmethod
@@ -224,6 +246,97 @@ class EdamamePipeline:
         return model
 
     @staticmethod
+    def _load_efficientnet_model(
+        config_dict: Dict[str, Any],
+        checkpoint: Dict[str, Any],
+        torch_dtype: Optional[torch.dtype] = None,
+    ) -> nn.Module:
+        """
+        Load EfficientNet contrastive model.
+
+        Args:
+            config_dict: Model configuration
+            checkpoint: Loaded checkpoint
+            torch_dtype: Data type for model
+
+        Returns:
+            Loaded EfficientNet model
+        """
+        from edamame.model.efficientnet_contrastive import EfficientNetContrastive
+
+        # Extract state dict - handle different checkpoint formats
+        if "state_dict" in checkpoint:
+            state_dict = checkpoint["state_dict"]
+            # Remove 'model.' prefix if present (from Lightning checkpoints)
+            state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
+        else:
+            state_dict = checkpoint
+
+        # Infer model parameters from state dict if config is empty
+        if not config_dict:
+            config_dict = EdamamePipeline._infer_efficientnet_config_from_state_dict(state_dict)
+
+        # Create model
+        model = EfficientNetContrastive(**config_dict)
+
+        # Load weights
+        model.load_state_dict(state_dict, strict=False)
+
+        # Convert dtype if specified
+        if torch_dtype is not None:
+            model = model.to(dtype=torch_dtype)
+
+        return model
+
+    @staticmethod
+    def _infer_efficientnet_config_from_state_dict(
+        state_dict: Dict[str, torch.Tensor],
+    ) -> Dict[str, Any]:
+        """
+        Infer EfficientNet configuration from state dictionary.
+
+        Args:
+            state_dict: Model state dictionary
+
+        Returns:
+            Inferred configuration dictionary
+        """
+        config = {}
+
+        # Infer stem channels
+        if "stem_conv.weight" in state_dict:
+            config["in_channels"] = state_dict["stem_conv.weight"].shape[1]
+            config["stem_channels"] = state_dict["stem_conv.weight"].shape[0]
+
+        # Infer head channels
+        if "head_conv.weight" in state_dict:
+            config["head_channels"] = state_dict["head_conv.weight"].shape[0]
+
+        # Infer embedding dimension
+        if "embedding.weight" in state_dict:
+            config["embedding_dim"] = state_dict["embedding.weight"].shape[0]
+
+        # Count MBConv blocks
+        num_mbconv_blocks = 0
+        for key in state_dict.keys():
+            if key.startswith("mbconv_blocks."):
+                layer_idx = int(key.split(".")[1])
+                num_mbconv_blocks = max(num_mbconv_blocks, layer_idx + 1)
+
+        if num_mbconv_blocks > 0:
+            config["num_mbconv_blocks"] = num_mbconv_blocks
+
+        # Infer mbconv_channels from first MBConv block
+        if "mbconv_blocks.0.expand_conv.weight" in state_dict:
+            config["mbconv_channels"] = state_dict["mbconv_blocks.0.project_conv.weight"].shape[0]
+
+        # Set default values
+        config.setdefault("seq_len", 240)
+        config.setdefault("dropout", 0.1)
+
+        return config
+
+    @staticmethod
     def _infer_mae_config_from_state_dict(
         state_dict: Dict[str, torch.Tensor],
     ) -> Dict[str, Any]:
@@ -298,20 +411,26 @@ class EdamamePipeline:
         For MAE models, this returns the encoded representation from the
         encoder (before decoding). By default, no masking is applied during
         inference to get embeddings of the full input.
+        
+        For EfficientNet models, this returns the embedding from the encoder.
 
         Args:
             x: Input tensor of shape (batch_size, seq_len, in_channels)
                or any format that can be converted to this shape
             mask_ratio: Ratio of patches to mask (default: 0.0 for full encoding)
+                       Only used for MAE models.
             return_mask: If True, return tuple of (embeddings, mask, ids_restore)
+                        Only used for MAE models.
 
         Returns:
-            Embeddings tensor of shape (batch_size, num_visible_patches, embed_dim)
-            or tuple of (embeddings, mask, ids_restore) if return_mask=True
+            Embeddings tensor of shape (batch_size, num_visible_patches, embed_dim) for MAE
+            or (batch_size, embedding_dim) for EfficientNet
+            or tuple of (embeddings, mask, ids_restore) if return_mask=True (MAE only)
 
         Example:
             >>> embeddings = pipeline.embed(batch_data)
-            >>> # Get shape: (batch_size, num_patches, embed_dim)
+            >>> # Get shape: (batch_size, num_patches, embed_dim) for MAE
+            >>> # Get shape: (batch_size, embedding_dim) for EfficientNet
         """
         # Ensure input is a tensor
         if not isinstance(x, torch.Tensor):
@@ -320,10 +439,9 @@ class EdamamePipeline:
         # Move to device
         x = x.to(self.device)
 
-        if self.z_norm_input:
-            mean_x = x.mean(dim=1, keepdim=True)
-            std_x = x.std(dim=1, unbiased=False, keepdim=True)
-            x = (x - mean_x) / (std_x + 1e-8)
+        # Apply normalization if provided
+        if self.normalization_fn is not None:
+            x = torch.from_numpy(self.normalization_fn(x.cpu().numpy()))
 
         # Ensure model is in eval mode
         self.model.eval()
@@ -337,6 +455,10 @@ class EdamamePipeline:
 
                 if return_mask:
                     return embeddings, mask, ids_restore
+                return embeddings
+            elif self.model_name.lower() == "efficientnet":
+                # Use EfficientNet's get_representation method
+                embeddings = self.model.get_representation(x)
                 return embeddings
             else:
                 raise NotImplementedError(
@@ -353,6 +475,13 @@ class EdamamePipeline:
 
         For MAE models, this performs the full forward pass: encode with masking,
         then decode to reconstruct the original signal.
+        
+        Note: This method is only available for MAE models. EfficientNet models
+        do not support reconstruction.
+        
+        Important: If a normalization function is provided, the reconstruction
+        will be in the normalized space. For inverse normalization (e.g., z-score),
+        you need to manually apply the inverse transformation to the output.
 
         Args:
             x: Input tensor of shape (batch_size, seq_len, in_channels)
@@ -360,6 +489,9 @@ class EdamamePipeline:
 
         Returns:
             Reconstructed time series of shape (batch_size, seq_len, in_channels)
+            
+        Raises:
+            NotImplementedError: If called on non-MAE models
 
         Example:
             >>> reconstructed = pipeline.reconstruct(batch_data, mask_ratio=0.75)
@@ -371,11 +503,9 @@ class EdamamePipeline:
         # Move to device
         x = x.to(self.device)
         
-        if self.z_norm_input:
-            eps = 1e-8
-            mean_x = x.mean(dim=1, keepdim=True)
-            std_x = x.std(dim=1, unbiased=False, keepdim=True)
-            x = (x - mean_x) / (std_x + eps)
+        # Apply normalization if provided
+        if self.normalization_fn is not None:
+            x = self.normalization_fn(x)
 
         # Ensure model is in eval mode
         self.model.eval()
@@ -384,12 +514,11 @@ class EdamamePipeline:
             if self.model_name.lower() == "mae":
                 # Use MAE's reconstruct method
                 reconstruction, _ = self.model.reconstruct(x, mask_ratio=mask_ratio)
-                if self.z_norm_input:
-                    reconstruction = reconstruction * (std_x + eps) + mean_x
                 return reconstruction
             else:
                 raise NotImplementedError(
-                    f"Reconstruct method not implemented for model: {self.model_name}"
+                    f"Reconstruct method not implemented for model: {self.model_name}. "
+                    f"Only MAE models support reconstruction."
                 )
 
     def __call__(

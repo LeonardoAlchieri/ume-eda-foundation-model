@@ -1,0 +1,22 @@
+# EfficientNet-based contrastive model configuration
+
+_target_: edamame.model.efficientnet_contrastive.EfficientNetContrastive
+
+# Input specifications
+in_channels: 1
+seq_len: ${segment_length}
+
+# Architecture parameters
+stem_channels: 32
+mbconv_channels: 64
+num_mbconv_blocks: 16  # M parameter - number of MBConv1D blocks. Apple used 16!
+head_channels: 128
+embedding_dim: 512
+
+# Regularization
+dropout: 0.1
+
+# Loss function configuration
+loss_fn:
+  _target_: edamame.model.loss.contrastive.NCELossCorrected
+  temperature: 0.04

@@ -13,7 +13,7 @@ logger = getLogger(__name__)
 
 @hydra.main(
     config_path="./configs/train",
-    config_name="reconstruction_sweep",  # TODO: change config name
+    config_name="contrastive_sweep",  # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):

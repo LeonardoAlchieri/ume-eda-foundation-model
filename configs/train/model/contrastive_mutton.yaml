@@ -4,7 +4,7 @@ _target_: edamame.model.matton_constrastive.ContrastiveModel
 
 encoder_net:
   _target_: edamame.model.nn.cnn_encoder.CNNEncoder 
-  input_dim: 120  # 60 seconds * 4 Hz
+  input_dim: ${segment_length}  # 60 seconds * 4 Hz
   dropout_prob: 0.1
   kernel_size: 7
   stride: 1

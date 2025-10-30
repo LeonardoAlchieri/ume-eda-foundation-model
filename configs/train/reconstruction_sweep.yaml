@@ -24,8 +24,9 @@ dataset:
     _partial_: true
 
 model:
+  mask_ratio: 0.0
   loss_fn:
-    masked_weight: 1.0
+    masked_weight: 0.0
 
 
 # Save configuration
@@ -35,7 +36,7 @@ save_final_checkpoint: true
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 400
-  accelerator: cpu
+  accelerator: auto
   devices: auto
   log_every_n_steps: 10
   deterministic: false
@@ -45,13 +46,12 @@ trainer:
   logger: ${logger}
   check_val_every_n_epoch: 1
   callbacks: ${callbacks}
-  # fast_dev_run: 50
+  # fast_dev_run: 10
   # profiler: simple
 
 # Override dataloader settings
 dataloader:
   batch_size: 1024
-  shuffle: true
   num_workers: 8
   pin_memory: true
   drop_last: true

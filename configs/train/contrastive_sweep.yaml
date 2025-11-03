@@ -21,8 +21,7 @@ seed: 600
 dataset:
   channels: 1
   sample_scaling_method: 
-    _target_: edamame.utils.sample_scaling.mean_scaling
-    _partial_: true
+    _target_: null
 
 
 # Save configuration
@@ -33,7 +32,7 @@ trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 400
   accelerator: cuda
-  devices: [0]
+  devices: auto
   log_every_n_steps: 10
   deterministic: false
   gradient_clip_val: 1.0
@@ -48,7 +47,7 @@ trainer:
 # Override dataloader settings
 dataloader:
   batch_size: 512
-  num_workers: 8
+  num_workers: 14
   pin_memory: true
   drop_last: true
   persistent_workers: true

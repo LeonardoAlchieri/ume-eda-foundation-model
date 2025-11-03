@@ -20,8 +20,7 @@ seed: 600
 
 dataset:
   channels: 1
-  sample_scaling_method: 
-    _target_: null
+  sample_scaling_method: null
 
 
 # Save configuration

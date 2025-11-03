@@ -19,6 +19,7 @@ experiment_name: "${model._target_}__${model.loss_fn._target_}__${dataset.datase
 seed: 600
 
 dataset:
+  channels: 1
   sample_scaling_method: 
     _target_: edamame.utils.sample_scaling.mean_scaling
     _partial_: true
@@ -56,7 +57,6 @@ dataloader:
 engine:
   data_augmentation:
     _target_: torchvision.transforms.RandomChoice
-    p: [1, 0, 0, 0]
     transforms:
       # Gaussian Noise
       - _target_: edamame.data_augmentation.matton_augment.GaussianNoiseStochastic
@@ -79,7 +79,7 @@ engine:
         knot_min: 1
         knot_max: 4
   optimizer_kwargs:
-    lr: 0.001
+    lr: 0.0005
     weight_decay: 0.001
   scheduler_kwargs:
     T_max: 100

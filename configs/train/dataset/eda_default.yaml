@@ -6,9 +6,13 @@ dataset_names:
   - APSync
   - BiHeartS
   - CLUES
+  - Dynamics
   - HeartS
   - LAUREATE
   - M2Sleep
+  - SEED-II-Lab
+  - SEED-II-Wild
+  - Workplaces
 shuffle: true
 train_val_test_size: [0.8, 0.1, 0.1]
 seed: 42

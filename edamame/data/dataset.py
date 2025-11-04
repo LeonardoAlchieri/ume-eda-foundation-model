@@ -10,6 +10,7 @@ from torch.utils.data import Dataset, random_split
 from pathlib import Path
 from typing import List, Optional, Union, Callable
 import logging
+from sklearn.preprocessing import LabelEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +60,8 @@ class EDAtaNoLabel(Dataset):
         self.sample_scaling_method = sample_scaling_method
 
         # Load all data
-        self.data = self._load_data()
-        
+        self.data, self.user_ids = self._load_data()
+
         self.train_val_test_size = train_val_test_size
 
         # Shuffle if requested
@@ -70,19 +71,19 @@ class EDAtaNoLabel(Dataset):
         logger.info(
             f"Loaded dataset with {len(self.data)} samples from {len(self.dataset_names)} dataset(s)"
         )
-        
+
     def _check_dataset_names(self, dataset_names: List[str]):
         """Check if the provided dataset names exist in the base path."""
         if dataset_names == "all":
-            dataset_names = [
-                d.name for d in self.base_path.iterdir() if d.is_dir()
-            ]
+            dataset_names = [d.name for d in self.base_path.iterdir() if d.is_dir()]
         for name in dataset_names:
             dataset_path = self.base_path / name
             if not dataset_path.exists() or not dataset_path.is_dir():
-                raise ValueError(f"Dataset path does not exist or is not a directory: {dataset_path}")
+                raise ValueError(
+                    f"Dataset path does not exist or is not a directory: {dataset_path}"
+                )
         return dataset_names
-        
+
     def get_splits(self):
         """
         Split the dataset into train, validation, and test sets.
@@ -91,7 +92,9 @@ class EDAtaNoLabel(Dataset):
             train_set, val_set, test_set: Subsets of the dataset
         """
         if self.train_val_test_size is None:
-            raise ValueError("train_val_test_size must be provided for splitting the dataset.")
+            raise ValueError(
+                "train_val_test_size must be provided for splitting the dataset."
+            )
 
         train_size, val_size, test_size = self.train_val_test_size
         if train_size + val_size + test_size != 1:
@@ -100,12 +103,16 @@ class EDAtaNoLabel(Dataset):
         train_set, val_set, test_set = random_split(
             self,
             [train_size, val_size, test_size],
-            generator=torch.Generator().manual_seed(self.seed) if self.seed is not None else None
+            generator=(
+                torch.Generator().manual_seed(self.seed)
+                if self.seed is not None
+                else None
+            ),
         )
 
         return train_set, val_set, test_set
-        
-    def _load_data(self) -> np.ndarray:
+
+    def _load_data(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Load data from all specified datasets.
 
@@ -113,6 +120,7 @@ class EDAtaNoLabel(Dataset):
             Concatenated numpy array of all loaded data
         """
         all_data = []
+        all_user_ids = []
 
         for dataset_name in self.dataset_names:
             dataset_path = self.base_path / dataset_name
@@ -135,9 +143,14 @@ class EDAtaNoLabel(Dataset):
                     # .npz files are dictionary-like, get the first array
                     # Usually saved with np.savez(filename, array) which stores as 'arr_0'
                     if len(npz_data.files) > 0:
-                        data: np.ndarray = npz_data['values']
+                        data: np.ndarray = npz_data["values"]
+                        user_id: np.ndarray = npz_data["groups"]
+                        # NOTE: adding the dataset name, since some datasets have overlapping user IDs
+                        user_id = np.asarray([f"{dataset_name}_{val}"for val in user_id])
                         all_data.append(data)
+                        all_user_ids.append(user_id)
                         logger.info(f"Loaded {data.shape} from {file_path}")
+                        logger.info(f"Loaded {user_id.shape} user IDs from {file_path}")
                     else:
                         logger.warning(f"No arrays found in {file_path}")
                 except Exception as e:
@@ -151,37 +164,42 @@ class EDAtaNoLabel(Dataset):
 
         # Concatenate all data along first axis
         concatenated_data = np.concatenate(all_data, axis=0)
+        user_ids_data = np.concatenate(all_user_ids, axis=0)
         
+        # NOTE: we need to convert the user ids to integers. We use sklearn
+        user_ids_data = LabelEncoder().fit_transform(user_ids_data)
+
         # Apply channel selection if specified
         if self.channels is not None:
-            if isinstance(self.channels, int):
+            if isinstance(self.channels, int) or isinstance(self.channels, Iterable):
                 # Single channel: output shape (N, T)
                 concatenated_data = concatenated_data[..., self.channels]
-                logger.info(f"Selected channel {self.channels}, new shape: {concatenated_data.shape}")
-            elif isinstance(self.channels, Iterable):
-                # Multiple channels: output shape (N, T, C)
-                concatenated_data = concatenated_data[..., self.channels]
-                logger.info(f"Selected channels {self.channels}, new shape: {concatenated_data.shape}")
+                logger.info(
+                    f"Selected channel {self.channels}, new shape: {concatenated_data.shape}"
+                )
             else:
-                raise ValueError(f"channels must be None, int, or Iterable[int], got {type(self.channels)}")
+                raise ValueError(
+                    f"channels must be None, int, or Iterable[int], got {type(self.channels)}"
+                )
         else:
             # Use all channels, squeeze if only one channel
             if concatenated_data.shape[-1] == 1:
                 concatenated_data = concatenated_data[..., 0]
-                logger.info(f"Squeezed single channel, new shape: {concatenated_data.shape}")
-                
+                logger.info(
+                    f"Squeezed single channel, new shape: {concatenated_data.shape}"
+                )
+
         if self.sample_scaling_method is not None:
             concatenated_data = self.sample_scaling_method(concatenated_data)
-            
-            # # Apply z-normalization per sample
-            # means = np.mean(concatenated_data, axis=1, keepdims=True)
-            # stds = np.std(concatenated_data, axis=1, keepdims=True) + 1e-8  # avoid division by zero
-            # concatenated_data = (concatenated_data - means) / stds
-            # logger.info(f"Applied z-normalization to data")
-                
-        logger.info(f"Concatenated data shape: {concatenated_data.shape}")
 
-        return concatenated_data
+        logger.info(f"Concatenated data shape: {concatenated_data.shape}")
+        
+        if concatenated_data.shape[0] != user_ids_data.shape[0]:
+            raise ValueError(
+                f"Data samples ({concatenated_data.shape[0]}) and user IDs ({user_ids_data.shape[0]}) have different lengths."
+            )
+
+        return concatenated_data, user_ids_data
 
     def _shuffle_data(self):
         """Shuffle the data in-place."""
@@ -191,6 +209,7 @@ class EDAtaNoLabel(Dataset):
         # Generate random permutation
         indices = np.random.permutation(len(self.data))
         self.data = self.data[indices]
+        self.user_ids = self.user_ids[indices]
         logger.info(f"Shuffled data with seed={self.seed}")
 
     def __len__(self) -> int:
@@ -210,12 +229,13 @@ class EDAtaNoLabel(Dataset):
         """
         # Load sample and convert to tensor
         sample = self.data[idx]
+        sample_user_id = self.user_ids[idx]
 
         # Convert to torch tensor
         x = torch.from_numpy(sample).float()
 
         # Return as dictionary (generic format)
-        return {"x": x}
+        return {"x": x, "user": sample_user_id}
 
     def reshuffle(self):
         """Reshuffle the dataset (useful between epochs)."""
@@ -235,4 +255,5 @@ class EDAtaNoLabel(Dataset):
             "base_path": str(self.base_path),
             "shuffled": self.shuffle,
             "channels": self.channels,
+            "unique_user_ids": np.unique(self.user_ids).tolist(),
         }

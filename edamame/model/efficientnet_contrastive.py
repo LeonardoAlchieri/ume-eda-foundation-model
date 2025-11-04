@@ -284,7 +284,7 @@ class EfficientNetContrastive(nn.Module):
         
         Args:
             output: Tuple of (h_1, h_2) embeddings
-            batch: Input batch (not used for contrastive loss)
+            batch: Input batch
             step: Training step indicator
             
         Returns:
@@ -294,8 +294,12 @@ class EfficientNetContrastive(nn.Module):
             raise ValueError("Loss function not provided. Please set loss_fn.")
         
         h_1, h_2 = output
-        # TODO: Implement ids using user assignment!
-        return self.loss_fn(h_1, h_2)
+        
+        if "user" in batch.keys():
+            user_ids = batch["user"]
+            return self.loss_fn(h_1, h_2, key_ids=user_ids)
+        else:
+            return self.loss_fn(h_1, h_2)
     
     def get_representation(self, x):
         """

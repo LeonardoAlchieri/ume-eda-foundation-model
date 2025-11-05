@@ -254,50 +254,9 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
             plt.tight_layout()
 
             # Log figure using Lightning's logger
-            self._log_figure(fig, f"reconstruction_overlay_sample")
+            self.log_figure(fig, f"reconstruction_overlay_sample_{sample_idx}")
 
             plt.close(fig)
-
-    def _log_figure(self, fig, tag):
-        """
-        Log a matplotlib figure using Lightning's logger.
-
-        Args:
-            fig: Matplotlib figure to log
-            tag: Tag/name for the figure
-        """
-        # Try different logging methods based on logger type
-        if hasattr(self.logger, "experiment"):
-            experiment = self.logger.experiment
-
-            # WandB logger
-            if hasattr(experiment, "log"):
-                try:
-                    import wandb
-
-                    experiment.log({tag: wandb.Image(fig)}, step=self.current_epoch)
-                    return
-                except (ImportError, AttributeError):
-                    pass
-
-            # TensorBoard logger
-            if hasattr(experiment, "add_figure"):
-                try:
-                    experiment.add_figure(tag, fig, global_step=self.current_epoch)
-                    return
-                except AttributeError:
-                    pass
-
-        # Fallback: save to file
-        if hasattr(self.logger, "log_dir"):
-            import os
-
-            log_dir = self.logger.log_dir
-            if log_dir is not None:
-                os.makedirs(log_dir, exist_ok=True)
-                filepath = os.path.join(log_dir, f"{tag}_epoch{self.current_epoch}.png")
-                fig.savefig(filepath, dpi=150, bbox_inches="tight")
-                print(f"Saved plot to {filepath}")
 
     def on_after_batch_transfer(self, batch, dataloader_idx):
         """

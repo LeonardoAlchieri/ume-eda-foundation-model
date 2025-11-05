@@ -19,6 +19,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
     def __init__(
         self,
         model: nn.Module,
+        seed: int,
         metrics: Optional[Mapping[str, Metric]] = None,
         optimizer: Optional[Type[Optimizer]] = None,
         optimizer_kwargs: Optional[Mapping[str, Any]] = None,
@@ -38,6 +39,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             data_augmentation: Data augmentation pipeline (nn.Module) to apply to batch
         """
         super(BaseSelfSupervisedEngine, self).__init__()
+        self.seed = seed
         self.model = model
         self.save_hyperparameters(ignore=["model", "data_augmentation"], logger=False)
 
@@ -124,6 +126,88 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             prog_bar=True,
             **kwargs,
         )
+
+    def log_figure(self, fig, tag: str, step: Optional[int] = None):
+        """
+        Log a matplotlib figure using Lightning's logger.
+        
+        Supports multiple logger types (WandB, TensorBoard, etc.) and falls back
+        to saving to file if no compatible logger is found.
+
+        Args:
+            fig: Matplotlib figure to log
+            tag: Tag/name for the figure
+            step: Optional step/epoch number (defaults to self.current_epoch)
+        """
+        if step is None:
+            step = self.current_epoch
+            
+        # Try different logging methods based on logger type
+        if self.logger is None:
+            # No logger configured, save to file as fallback
+            self._save_figure_to_file(fig, tag, step)
+            return
+            
+        if hasattr(self.logger, "experiment"):
+            experiment = self.logger.experiment
+
+            # WandB logger
+            if hasattr(experiment, "log"):
+                try:
+                    import wandb
+                    experiment.log({tag: wandb.Image(fig)}, step=step)
+                    return
+                except (ImportError, AttributeError):
+                    pass
+
+            # TensorBoard logger
+            if hasattr(experiment, "add_figure"):
+                try:
+                    experiment.add_figure(tag, fig, global_step=step)
+                    return
+                except AttributeError:
+                    pass
+
+        # Other loggers with log_figure method
+        if hasattr(self.logger, "log_figure"):
+            try:
+                self.logger.log_figure(tag, fig, step)
+                return
+            except (AttributeError, TypeError):
+                pass
+
+        # Fallback: save to file
+        self._save_figure_to_file(fig, tag, step)
+
+    def _save_figure_to_file(self, fig, tag: str, step: int):
+        """
+        Fallback method to save figure to file when logger doesn't support figures.
+        
+        Args:
+            fig: Matplotlib figure to save
+            tag: Tag/name for the figure
+            step: Step/epoch number
+        """
+        import os
+        
+        # Try to get log directory from logger
+        log_dir = None
+        if hasattr(self.logger, "log_dir") and self.logger.log_dir is not None:
+            log_dir = self.logger.log_dir
+        elif hasattr(self.logger, "save_dir") and self.logger.save_dir is not None:
+            log_dir = self.logger.save_dir
+        else:
+            # Default to current directory
+            log_dir = "."
+            
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Create filename with tag and step
+        filename = f"{tag.replace('/', '_')}_step{step}.png"
+        filepath = os.path.join(log_dir, filename)
+        
+        fig.savefig(filepath, dpi=150, bbox_inches="tight")
+        print(f"Saved plot to {filepath}")
 
     def apply_scaling(self, x: torch.Tensor) -> torch.Tensor:
         if "mean" not in self.scaling_params or "std" not in self.scaling_params:

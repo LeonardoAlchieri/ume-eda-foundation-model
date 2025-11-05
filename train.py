@@ -63,6 +63,18 @@ def main(cfg: DictConfig):
 
     # trainer.test(engine, test_loader, ckpt_path="best")
     trainer.test(engine, test_loader)
+    
+    
+    #############################
+    ### FINALIZE LOGGER #########
+    #############################
+    # Explicitly finalize logger to ensure proper cleanup between runs
+    if trainer.logger is not None:
+        trainer.logger.finalize("success")
+        
+    # For WandB specifically, ensure run is finished
+    if hasattr(trainer.logger, 'experiment') and hasattr(trainer.logger.experiment, 'finish'):
+        trainer.logger.experiment.finish()
 
 
 if __name__ == "__main__":

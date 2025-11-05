@@ -5,4 +5,7 @@ project: cranberry-juicing
 name: ${experiment_name}
 save_dir: ./wandb_logs
 log_model: true  # Enable model checkpoint logging
+reinit: true  # Force reinitialization for each run
+id: null  # Let WandB generate unique IDs
+resume: "never"  # Never resume runs in sweep mode
 # config: ${..}

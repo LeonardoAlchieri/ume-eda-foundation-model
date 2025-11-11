@@ -17,7 +17,12 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
     the data augmentation pipeline.
     """
 
-    def __init__(self, *args, max_users_to_plot: int = 10, **kwargs):
+    def __init__(
+        self,
+        *args,
+        plotting_kwargs: dict = {"max_users": 10, "max_segments_per_user": 20},
+        **kwargs,
+    ):
         """
         Initialize contrastive engine with embedding collection for visualization.
 
@@ -32,7 +37,11 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         self.validation_embeddings = []
         self.validation_users = []
         # Maximum number of users to plot
-        self.max_users_to_plot = max_users_to_plot
+        if "max_users" not in plotting_kwargs.keys() or "max_segments_per_user" not in plotting_kwargs.keys():
+            raise ValueError(
+                "plotting_kwargs must contain 'max_users' and 'max_segments_per_user' keys."
+            )
+        self.plotting_kwargs = plotting_kwargs
 
     def forward(self, batch):
         """Forward pass through the model."""
@@ -169,7 +178,10 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         umap = UMAP(
             n_components=2,
             random_state=self.seed,
-            n_neighbors=min(15, embeddings_np.shape[0] - 1),
+            n_neighbors=min(5, embeddings_np.shape[0] - 1),
+            min_dist=0.1,
+            spread=1.5,
+            metric="euclidean",
         )
         embeddings_2d = umap.fit_transform(embeddings_np)
 
@@ -179,22 +191,43 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         # Get unique users
         unique_users = np.unique(all_users)
 
+        if self.plotting_kwargs['max_users'] is None:
+            self.plotting_kwargs['max_users'] = len(unique_users)
+            
         # Sample users if there are more than max_users_to_plot
-        if len(unique_users) > self.max_users_to_plot:
+        if len(unique_users) > self.plotting_kwargs['max_users']:
             print(
-                f"Sampling {self.max_users_to_plot} out of {len(unique_users)} users for visualization..."
+                f"Sampling {self.plotting_kwargs['max_users']} out of {len(unique_users)} users for visualization..."
             )
             rng = np.random.RandomState(self.seed)
             selected_users = rng.choice(
-                unique_users, size=self.max_users_to_plot, replace=False
+                unique_users, size=self.plotting_kwargs['max_users'], replace=False
             )
         else:
             selected_users = unique_users
-
+            
         # Filter embeddings and users to only include selected users
         mask_selected = np.isin(all_users, selected_users)
         embeddings_2d_filtered = embeddings_2d[mask_selected]
         all_users_filtered = all_users[mask_selected]
+        
+        if self.plotting_kwargs['max_segments_per_user'] is not None:
+            # Further limit number of segments per user
+            filtered_indices = []
+            for user in selected_users:
+                user_indices = np.where(all_users_filtered == user)[0]
+                if len(user_indices) > self.plotting_kwargs['max_segments_per_user']:
+                    rng = np.random.RandomState(self.seed)
+                    sampled_indices = rng.choice(
+                        user_indices,
+                        size=self.plotting_kwargs['max_segments_per_user'],
+                        replace=False,
+                    )
+                    filtered_indices.extend(sampled_indices)
+                else:
+                    filtered_indices.extend(user_indices)
+            embeddings_2d_filtered = embeddings_2d_filtered[filtered_indices]
+            all_users_filtered = all_users_filtered[filtered_indices]
 
         # Assign colors to selected users
         colors = plt.cm.tab20(np.linspace(0, 1, len(selected_users)))

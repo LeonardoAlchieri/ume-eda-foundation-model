@@ -37,7 +37,7 @@ def main(cfg: DictConfig):
     )
     test_loader = DataLoader(
         test_set,
-       shuffle=False, 
+        shuffle=False,
         **cfg.dataloader,
     )
 
@@ -45,7 +45,8 @@ def main(cfg: DictConfig):
     ####### MODELS SETUP ########
     #############################
     engine = instantiate(
-        cfg.engine, scaling_params=instantiate(cfg.dataset_scaling_fun)(dataset=train_set)
+        cfg.engine,
+        scaling_params=instantiate(cfg.dataset_scaling_fun)(dataset=train_set),
     )
 
     trainer = instantiate(cfg.trainer)
@@ -58,23 +59,32 @@ def main(cfg: DictConfig):
     #############################
     ####### MODELS TRAIN ########
     #############################
+    try:
+        trainer.fit(engine, train_loader, val_loader)
+    except KeyboardInterrupt:
+        logger.info("Training interrupted by user.")
+    finally:
+        trainer.test(engine, test_loader, ckpt_path="best")
+        # best_model_path = (
+        #     trainer.checkpoint_callback.best_model_path
+        #     if trainer.checkpoint_callback
+        #     else engine
+        # )
 
-    trainer.fit(engine, train_loader, val_loader)
+        # TODO: add downstream task evaluation
 
-    # trainer.test(engine, test_loader, ckpt_path="best")
-    trainer.test(engine, test_loader)
-    
-    
-    #############################
-    ### FINALIZE LOGGER #########
-    #############################
-    # Explicitly finalize logger to ensure proper cleanup between runs
-    if trainer.logger is not None:
-        trainer.logger.finalize("success")
-        
-    # For WandB specifically, ensure run is finished
-    if hasattr(trainer.logger, 'experiment') and hasattr(trainer.logger.experiment, 'finish'):
-        trainer.logger.experiment.finish()
+        #############################
+        ### FINALIZE LOGGER #########
+        #############################
+        # Explicitly finalize logger to ensure proper cleanup between runs
+        if trainer.logger is not None:
+            trainer.logger.finalize("success")
+
+        # For WandB specifically, ensure run is finished
+        if hasattr(trainer.logger, "experiment") and hasattr(
+            trainer.logger.experiment, "finish"
+        ):
+            trainer.logger.experiment.finish()
 
 
 if __name__ == "__main__":

@@ -47,7 +47,7 @@ class EdamamePipeline:
     def __init__(
         self,
         model: nn.Module,
-        model_name: str,
+        model_name: str | None,
         device: torch.device,
         normalization_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         model_config: Optional[Dict[str, Any]] = None,
@@ -93,10 +93,11 @@ class EdamamePipeline:
             model_config: Path to model config file or config dict.
                          If None, will try to extract from checkpoint.
             device_map: Device mapping strategy:
-                       - "auto": automatically select device (GPU if available)
+                       - "auto": automatically select device (MPS > CUDA > CPU)
                        - "cpu": use CPU
-                       - "cuda": use GPU
-                       - "cuda:0": use specific GPU
+                       - "cuda": use CUDA GPU
+                       - "cuda:0": use specific CUDA GPU
+                       - "mps": use Apple Silicon GPU
             torch_dtype: Data type for model parameters (e.g., torch.float32, torch.float16)
             normalization_fn: Optional normalization function to apply to inputs.
                             Should accept a torch.Tensor and return a torch.Tensor.
@@ -156,9 +157,23 @@ class EdamamePipeline:
             torch.device object
         """
         if device_map == "auto":
-            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            # Priority: MPS (Apple Silicon) > CUDA > CPU
+            if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+                return torch.device("mps")
+            elif torch.cuda.is_available():
+                return torch.device("cuda")
+            else:
+                return torch.device("cpu")
         elif device_map == "cpu":
             return torch.device("cpu")
+        elif device_map == "mps":
+            if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+                return torch.device("mps")
+            else:
+                raise RuntimeError(
+                    "MPS device requested but not available. "
+                    "Make sure you're running on Apple Silicon with PyTorch >= 1.12"
+                )
         elif device_map.startswith("cuda"):
             return torch.device(device_map)
         else:

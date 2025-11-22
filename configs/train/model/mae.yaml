@@ -1,5 +1,5 @@
 _target_: edamame.model.mae.MaskedAutoencoder
-seq_len: ${segment_length}
+seq_len: ${dataset.segment_length}
 in_channels: 1
 patch_size: 10
 embed_dim: 512

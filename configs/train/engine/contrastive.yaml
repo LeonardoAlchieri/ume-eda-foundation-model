@@ -3,6 +3,7 @@
 _target_: edamame.engine.ContrastiveEngine
 
 model: ${model}
+seed: ${seed}
 
 # Optimizer configuration
 optimizer:

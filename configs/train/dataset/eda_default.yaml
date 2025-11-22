@@ -1,7 +1,7 @@
 # Default dataset configuration
 
-_target_: edamame.data.dataset.EDAtaNoLabel
-base_path: "./data.nosync/${segment_length_in_seconds}s"
+_target_: edamame.data.dataset_online.EDAtaNoLabelOnlineSegmentation
+base_path: "./data.nosync/online/"
 dataset_names: 
   - APSync
   - BiHeartS
@@ -18,3 +18,8 @@ train_val_test_size: [0.8, 0.1, 0.1]
 seed: 42
 channels: 0  # Channel to use (e.g., 0 for first channel). Use None for all channels. Use a list for multiple channels.
 sample_scaling_method: null
+segment_length: 240
+shift: 1
+splitting_method:
+  _target_: edamame.utils.splitting.user_session_splitting
+  _partial_: true

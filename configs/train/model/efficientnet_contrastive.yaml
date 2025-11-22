@@ -4,7 +4,7 @@ _target_: edamame.model.efficientnet_contrastive.EfficientNetContrastive
 
 # Input specifications
 in_channels: 1
-seq_len: ${segment_length}
+seq_len: ${dataset.segment_length}
 
 # Architecture parameters
 stem_channels: 32

@@ -198,6 +198,7 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
 
         # NOTE: we need to convert the user ids to integers. We use sklearn
         user_ids_data = LabelEncoder().fit_transform(user_ids_data)
+        self.unique_user_ids = np.unique(user_ids_data)
 
         all_data = [
             {
@@ -254,23 +255,22 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
 
         return {"x": x, "user": sample_user_id}
 
-    def reshuffle(self):
-        """Reshuffle the dataset (useful between epochs)."""
-        self._shuffle_data()
+    # def reshuffle(self):
+    #     """Reshuffle the dataset (useful between epochs)."""
+    #     self._shuffle_data()
 
     def get_data_shape(self) -> tuple:
         """Return the shape of a single data sample."""
-        return self.data[0].shape
+        return self.__getitem__(0)["x"].shape
 
     def get_dataset_info(self) -> dict:
         """Return information about the dataset."""
         return {
             "num_samples": len(self.data),
-            "data_shape": self.data.shape,
-            "sample_shape": self.get_data_shape(),
+            "data_shape": self.get_data_shape(),
             "dataset_names": self.dataset_names,
             "base_path": str(self.base_path),
             "shuffled": self.shuffle,
             "channels": self.channels,
-            "unique_user_ids": np.unique(self.user_ids).tolist(),
+            "unique_user_ids": self.unique_user_ids,
         }

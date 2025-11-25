@@ -27,7 +27,7 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         Initialize contrastive engine with embedding collection for visualization.
 
         Args:
-            max_users_to_plot: Maximum number of users to plot in UMAP visualization (default: 20)
+            plotting_kwargs: Dictionary with 'max_users' and 'max_segments_per_user' keys
         """
         super().__init__(*args, **kwargs)
         # Storage for train embeddings and user labels
@@ -36,6 +36,11 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         # Storage for validation embeddings and user labels
         self.validation_embeddings = []
         self.validation_users = []
+        
+        # Tracking for early stopping during collection
+        self.train_user_counts = {}  # {user_id: count}
+        self.val_user_counts = {}  # {user_id: count}
+        
         # Maximum number of users to plot
         if "max_users" not in plotting_kwargs.keys() or "max_segments_per_user" not in plotting_kwargs.keys():
             raise ValueError(
@@ -91,6 +96,37 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
 
         return batch
 
+    def _collect_embeddings_for_visualization(self, batch, user_counts: dict, embeddings_list: list, users_list: list):
+        """
+        Collect embeddings and user labels for visualization if requirements not met.
+        
+        Args:
+            batch: Current batch containing 'x_1', 'x', and 'user'
+            user_counts: Dictionary tracking samples per user
+            embeddings_list: List to append collected embeddings to
+            users_list: List to append collected user labels to
+        """
+        # Only collect embeddings if we haven't reached our limits
+        if "user" in batch and not self._collection_complete(user_counts):
+            with torch.no_grad():
+                # Get embeddings from the model
+                x = batch.get("x_1", batch["x"])
+                # Extract embeddings
+                embeddings = self.model.get_representation(x)
+                embeddings_cpu = embeddings.detach().cpu()
+                
+                # Get user labels
+                users = batch["user"]
+                if torch.is_tensor(users):
+                    users = users.cpu().numpy()
+                
+                # Selectively collect embeddings based on requirements
+                selected_indices = self._select_samples_to_collect(users, user_counts)
+                
+                if len(selected_indices) > 0:
+                    embeddings_list.append(embeddings_cpu[selected_indices])
+                    users_list.append(users[selected_indices])
+
     def training_step(self, batch, batch_idx):
         """
         Training step with embedding collection for visualization.
@@ -99,51 +135,89 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         # Call parent's training step
         train_loss = super().training_step(batch, batch_idx)
 
-        # Collect embeddings and user labels for visualization
-        with torch.no_grad():
-            # Get embeddings from the model (using x_1, which is the augmented view)
-            x = batch.get("x_1", batch["x"])
-            # Extract embeddings
-            embeddings = self.model.get_representation(x)
-
-            # Store embeddings and user labels
-            self.train_embeddings.append(embeddings.detach().cpu())
-
-            # Get user labels if available
-            if "user" in batch:
-                users = batch["user"]
-                if torch.is_tensor(users):
-                    users = users.cpu().numpy()
-                self.train_users.append(users)
+        # Collect embeddings for visualization
+        self._collect_embeddings_for_visualization(
+            batch, self.train_user_counts, self.train_embeddings, self.train_users
+        )
 
         return train_loss
 
     def validation_step(self, batch, batch_idx):
         """
         Validation step with embedding collection for visualization.
-        Collects embeddings and user labels for t-SNE plotting.
+        Collects embeddings and user labels for UMAP plotting.
         """
         # Call parent's validation step
         val_loss = super().validation_step(batch, batch_idx)
 
-        # Collect embeddings and user labels for visualization
-        with torch.no_grad():
-            # Get embeddings from the model (using x_1, which is the augmented view)
-            x = batch.get("x_1", batch["x"])
-            # Extract embeddings
-            embeddings = self.model.get_representation(x)
-
-            # Store embeddings and user labels
-            self.validation_embeddings.append(embeddings.detach().cpu())
-
-            # Get user labels if available
-            if "user" in batch:
-                users = batch["user"]
-                if torch.is_tensor(users):
-                    users = users.cpu().numpy()
-                self.validation_users.append(users)
+        # Collect embeddings for visualization
+        self._collect_embeddings_for_visualization(
+            batch, self.val_user_counts, self.validation_embeddings, self.validation_users
+        )
 
         return val_loss
+    
+    def _collection_complete(self, user_counts: dict) -> bool:
+        """
+        Check if we've collected enough samples for visualization.
+        
+        Args:
+            user_counts: Dictionary tracking samples per user
+            
+        Returns:
+            True if collection requirements are met
+        """
+        max_users = self.plotting_kwargs['max_users']
+        max_segments = self.plotting_kwargs['max_segments_per_user']
+        
+        # If max_users is None, never stop (collect everything)
+        if max_users is None:
+            return False
+            
+        # Check if we have enough users
+        if len(user_counts) < max_users:
+            return False
+            
+        # Check if all users have enough segments (if max_segments is set)
+        if max_segments is not None:
+            return all(count >= max_segments for count in user_counts.values())
+        
+        return True
+    
+    def _select_samples_to_collect(self, users: np.ndarray, user_counts: dict) -> list:
+        """
+        Select which samples from the batch to collect based on current counts.
+        
+        Args:
+            users: Array of user labels from current batch
+            user_counts: Dictionary tracking samples per user
+            
+        Returns:
+            List of indices to collect from the batch
+        """
+        max_users = self.plotting_kwargs['max_users']
+        max_segments = self.plotting_kwargs['max_segments_per_user']
+        
+        selected_indices = []
+        
+        for idx, user in enumerate(users):
+            user = int(user)  # Ensure user is hashable
+            
+            # Check if we already have enough users
+            if max_users is not None and user not in user_counts:
+                if len(user_counts) >= max_users:
+                    continue  # Skip new users if we have enough
+            
+            # Check if we have enough segments for this user
+            current_count = user_counts.get(user, 0)
+            if max_segments is not None and current_count >= max_segments:
+                continue  # Skip if this user has enough segments
+            
+            # Add this sample
+            selected_indices.append(idx)
+            user_counts[user] = current_count + 1
+        
+        return selected_indices
 
     def _plot_embedding_visualization(self, embeddings_list, users_list, split="val"):
         """
@@ -188,56 +262,18 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         # Create scatter plot
         fig, ax = plt.subplots(figsize=(10, 8))
 
-        # Get unique users
+        # Get unique users (already filtered during collection)
         unique_users = np.unique(all_users)
 
-        if self.plotting_kwargs['max_users'] is None:
-            self.plotting_kwargs['max_users'] = len(unique_users)
-            
-        # Sample users if there are more than max_users_to_plot
-        if len(unique_users) > self.plotting_kwargs['max_users']:
-            print(
-                f"Sampling {self.plotting_kwargs['max_users']} out of {len(unique_users)} users for visualization..."
-            )
-            rng = np.random.RandomState(self.seed)
-            selected_users = rng.choice(
-                unique_users, size=self.plotting_kwargs['max_users'], replace=False
-            )
-        else:
-            selected_users = unique_users
-            
-        # Filter embeddings and users to only include selected users
-        mask_selected = np.isin(all_users, selected_users)
-        embeddings_2d_filtered = embeddings_2d[mask_selected]
-        all_users_filtered = all_users[mask_selected]
-        
-        if self.plotting_kwargs['max_segments_per_user'] is not None:
-            # Further limit number of segments per user
-            filtered_indices = []
-            for user in selected_users:
-                user_indices = np.where(all_users_filtered == user)[0]
-                if len(user_indices) > self.plotting_kwargs['max_segments_per_user']:
-                    rng = np.random.RandomState(self.seed)
-                    sampled_indices = rng.choice(
-                        user_indices,
-                        size=self.plotting_kwargs['max_segments_per_user'],
-                        replace=False,
-                    )
-                    filtered_indices.extend(sampled_indices)
-                else:
-                    filtered_indices.extend(user_indices)
-            embeddings_2d_filtered = embeddings_2d_filtered[filtered_indices]
-            all_users_filtered = all_users_filtered[filtered_indices]
+        # Assign colors to users
+        colors = plt.cm.tab20(np.linspace(0, 1, len(unique_users)))
 
-        # Assign colors to selected users
-        colors = plt.cm.tab20(np.linspace(0, 1, len(selected_users)))
-
-        # Plot each selected user with a different color
-        for idx, user in enumerate(selected_users):
-            mask = all_users_filtered == user
+        # Plot each user with a different color
+        for idx, user in enumerate(unique_users):
+            mask = all_users == user
             ax.scatter(
-                embeddings_2d_filtered[mask, 0],
-                embeddings_2d_filtered[mask, 1],
+                embeddings_2d[mask, 0],
+                embeddings_2d[mask, 1],
                 c=[colors[idx]],
                 label=f"User {user}",
                 alpha=0.6,
@@ -269,9 +305,10 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
             self.train_embeddings, self.train_users, split="train"
         )
 
-        # Clear storage for next epoch
+        # Clear storage and counters for next epoch
         self.train_embeddings = []
         self.train_users = []
+        self.train_user_counts = {}
 
     def on_validation_epoch_end(self):
         """
@@ -281,6 +318,7 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
             self.validation_embeddings, self.validation_users, split="val"
         )
 
-        # Clear storage for next epoch
+        # Clear storage and counters for next epoch
         self.validation_embeddings = []
         self.validation_users = []
+        self.val_user_counts = {}

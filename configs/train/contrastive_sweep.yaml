@@ -11,7 +11,7 @@ defaults:
   - _self_
   - override /hydra/sweeper: list
 
-experiment_name: "Shifted windows experiment (BiHeartS)"
+experiment_name: "MAE Shifted windows experiment (BiHeartS)"
 seed: 600
 
 dataset:
@@ -41,6 +41,7 @@ trainer:
   logger: ${logger}
   check_val_every_n_epoch: 1
   callbacks: ${callbacks}
+  limit_train_batches: 3000
   # fast_dev_run: 2
   # profiler: simple
 
@@ -54,30 +55,30 @@ dataloader:
 
 # Override engine settings (data augmentation and optimizer)
 engine:
-  data_augmentation:
-    _target_: torchvision.transforms.RandomChoice
-    transforms:
-      # # Gaussian Noise
-      # - _target_: edamame.data_augmentation.matton_augment.GaussianNoiseStochastic
-      #   sigma_scale_min: 0.0
-      #   sigma_scale_max: 0.5
-      # # Temporal Cutout
-      # - _target_: edamame.data_augmentation.matton_augment.TemporalCutoutStochastic
-      #   cutout_size_min: 20
-      #   cutout_size_max: 100
-      # # Magnitude Warping (Amplitude Warping)
-      # - _target_: edamame.data_augmentation.matton_augment.AmplitudeWarpingStochastic
-      #   sigma_min: 0.01
-      #   sigma_max: 0.05
-      #   knot_min: 0
-      #   knot_max: 4
-      # # Time Warping
-      # - _target_: edamame.data_augmentation.matton_augment.TimeWarpingStochastic
-      #   sigma_min: 0.01
-      #   sigma_max: 0.1
-      #   knot_min: 1
-      #   knot_max: 4
-      - _target_: edamame.data_augmentation.matton_augment.Identity
+  # data_augmentation:
+  #   _target_: torchvision.transforms.RandomChoice
+  #   transforms:
+  #     # # Gaussian Noise
+  #     # - _target_: edamame.data_augmentation.matton_augment.GaussianNoiseStochastic
+  #     #   sigma_scale_min: 0.0
+  #     #   sigma_scale_max: 0.5
+  #     # # Temporal Cutout
+  #     # - _target_: edamame.data_augmentation.matton_augment.TemporalCutoutStochastic
+  #     #   cutout_size_min: 20
+  #     #   cutout_size_max: 100
+  #     # # Magnitude Warping (Amplitude Warping)
+  #     # - _target_: edamame.data_augmentation.matton_augment.AmplitudeWarpingStochastic
+  #     #   sigma_min: 0.01
+  #     #   sigma_max: 0.05
+  #     #   knot_min: 0
+  #     #   knot_max: 4
+  #     # # Time Warping
+  #     # - _target_: edamame.data_augmentation.matton_augment.TimeWarpingStochastic
+  #     #   sigma_min: 0.01
+  #     #   sigma_max: 0.1
+  #     #   knot_min: 1
+  #     #   knot_max: 4
+  #     - _target_: edamame.data_augmentation.matton_augment.Identity
   optimizer_kwargs:
     lr: 0.001
     weight_decay: 0.001
@@ -91,25 +92,27 @@ dataset_scaling_fun:
 
 
 hydra:
-  mode: MULTIRUN
+  mode: RUN
   sweep:
-    dir: "outputs/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
+    dir: "outputs.nosync/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     subdir: "${seed}"
   sweeper:
     grid_params: 
       seed: 42
       engine.optimizer_kwargs.lr: 0.0005
-      
     list_params:
       model.mbconv_channels:
-      # - 8
+      - 8
       # - 64
       - 128
+      # - 128
       model.embedding_dim:
-      #- 32
+      - 32
       # - 128
       - 512
+      # - 512
       model.num_mbconv_blocks:
-      #- 8
+      - 4
       - 8
+      # - 12
 # play later with batch size

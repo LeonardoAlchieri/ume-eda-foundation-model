@@ -14,7 +14,7 @@ dataset_names:
   - SEED-II-Wild
   - Workplaces
 shuffle: true
-train_val_test_size: [0.8, 0.1, 0.1]
+train_val_test_size: [0.9, 0.1, 0.0]
 seed: 42
 channels: 0  # Channel to use (e.g., 0 for first channel). Use None for all channels. Use a list for multiple channels.
 sample_scaling_method: null

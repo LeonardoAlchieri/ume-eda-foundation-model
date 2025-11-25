@@ -60,7 +60,8 @@ def pre_train(cfg: DictConfig) -> tuple[BaseSelfSupervisedEngine, Logger]:
     except KeyboardInterrupt:
         logger.info("Training interrupted by user.")
     finally:
-        trainer.test(engine, test_loader, ckpt_path="best")
+        print("NO TESTING")
+        # trainer.test(engine, test_loader, ckpt_path="best")
 
         # TODO: load the best model before return the engine
         return engine, trainer.logger

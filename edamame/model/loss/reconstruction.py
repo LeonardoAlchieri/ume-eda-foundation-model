@@ -29,7 +29,7 @@ class DefaultMAELoss(nn.Module):
     challenging masked prediction task.
     """
     
-    def __init__(self, masked_weight=1.0):
+    def __init__(self, masked_weight=1.0, loss_type: str = "mae"):
         """
         Initialize the MAE loss module with configurable weights.
         
@@ -46,6 +46,12 @@ class DefaultMAELoss(nn.Module):
         """
         super(DefaultMAELoss, self).__init__()
         self.masked_weight = masked_weight
+        if isinstance(loss_type, str):
+            if loss_type not in ['mae', 'mse']:
+                raise ValueError("loss_type must be either 'mae' or 'mse'")
+            self.loss_type = loss_type.lower()
+        else:
+            raise ValueError("loss_type must be a string")
     
     def forward(self, pred, target, mask, patch_size, in_channels, num_patches):
         """
@@ -69,7 +75,10 @@ class DefaultMAELoss(nn.Module):
         )
         
         # Compute per-patch MSE loss
-        loss_per_patch = (pred - target_patches) ** 2
+        if self.loss_type == 'mae':
+            loss_per_patch = (pred - target_patches).abs()
+        else:  # mse
+            loss_per_patch = (pred - target_patches) ** 2
         loss_per_patch = loss_per_patch.mean(dim=-1)  # Mean over patch dimension
         
         # Compute loss on masked patches

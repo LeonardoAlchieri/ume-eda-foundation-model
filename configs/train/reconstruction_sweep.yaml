@@ -15,7 +15,7 @@ experiment_name: "MAE Shifted windows experiment (BiHeartS)"
 seed: 600
 
 dataset:
-  base_path: "/Users/leonardoalchieri/Desktop/GIT-Mine/datasets_cleaning/data_ready_nolabel.nosync" 
+  base_path: "./data_online.nosync" 
   channels: 1
   
   sample_scaling_method: null
@@ -27,9 +27,12 @@ dataset:
   - BiHeartS
 
 model:
-  mask_ratio: 0.3
+  mask_ratio: 0
+  embed_dim: 64
+  decoder_embed_dim: 64
   loss_fn:
-    masked_weight: 0.7
+    masked_weight: 0
+    loss_type: mae
 
 
 # Save configuration
@@ -40,7 +43,7 @@ trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 400
   accelerator: cuda
-  devices: [1]
+  devices: [0]
   log_every_n_steps: 10
   deterministic: false
   # gradient_clip_val: 1.0
@@ -49,7 +52,7 @@ trainer:
   logger: ${logger}
   check_val_every_n_epoch: 1
   callbacks: ${callbacks}
-  limit_train_batches: 3000
+  limit_train_batches: 0.3
   # fast_dev_run: 10
   # profiler: simple
 
@@ -76,7 +79,7 @@ dataset_scaling_fun:
 
 
 hydra:
-  mode: MULTIRUN
+  mode: RUN
   sweep:
     dir: "outputs.nosync/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     subdir: "${model.loss_fn.masked_weight}-${seed}"

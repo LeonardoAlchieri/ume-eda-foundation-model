@@ -10,13 +10,13 @@ defaults:
   - callbacks: default
   - _self_
 
-experiment_name: "MAE Shifted windows experiment (BiHeartS)"
+experiment_name: "Final code with downstream"
 seed: 600
 
 model:
   patch_size: 20
-  embed_dim: 8
-  decoder_embed_dim: 8
+  embed_dim: 16
+  decoder_embed_dim: 16
   mask_ratio: 0.1
   loss_fn:
     masked_weight: 0.1

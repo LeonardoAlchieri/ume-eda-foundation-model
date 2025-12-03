@@ -554,7 +554,7 @@ class EdamamePipeline:
             Output tensor based on the task
         """
         if task == "embed":
-            breakpoint()
+            
             return self.embed(x, **kwargs)
         elif task == "reconstruct":
             return self.reconstruct(x, **kwargs)

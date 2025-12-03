@@ -24,7 +24,9 @@ pretrain:
     dataset_names:
     - BiHeartS
   trainer:
-    fast_dev_run: 10
+    # fast_dev_run: 1
+    max_epochs: 2
+    limit_train_batches: 1
 
 # DOWNSTREAM PARAMS
 downstream:

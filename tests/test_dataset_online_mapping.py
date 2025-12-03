@@ -186,7 +186,7 @@ class TestDatasetOnlineMapping:
                 assert torch.allclose(actual_segment, expected_segment, rtol=1e-4, atol=1e-5), \
                 f"Segment {idx} data mismatch. Max diff: {torch.max(torch.abs(actual_segment - expected_segment))}"
             except AssertionError as e:
-                breakpoint()
+                
         
         print("✓ Segments are correctly extracted")
 

@@ -68,7 +68,7 @@ class EdamamePipeline:
         self.model_name = model_name
         self.device = device
         self.model_config = model_config or {}
-        self.normalization_fn = normalization_fn
+        # self.normalization_fn = normalization_fn
 
         # Set model to evaluation mode
         self.model.eval()
@@ -455,8 +455,8 @@ class EdamamePipeline:
         x = x.to(self.device)
 
         # Apply normalization if provided
-        if self.normalization_fn is not None:
-            x = torch.from_numpy(self.normalization_fn(x.cpu().numpy()))
+        # if self.normalization_fn is not None:
+        #     x = torch.from_numpy(self.normalization_fn(x.cpu().numpy()))
 
         # Ensure model is in eval mode
         self.model.eval()
@@ -519,8 +519,8 @@ class EdamamePipeline:
         x = x.to(self.device)
         
         # Apply normalization if provided
-        if self.normalization_fn is not None:
-            x = self.normalization_fn(x)
+        # if self.normalization_fn is not None:
+        #     x = self.normalization_fn(x)
 
         # Ensure model is in eval mode
         self.model.eval()
@@ -554,11 +554,51 @@ class EdamamePipeline:
             Output tensor based on the task
         """
         if task == "embed":
+            breakpoint()
             return self.embed(x, **kwargs)
         elif task == "reconstruct":
             return self.reconstruct(x, **kwargs)
         else:
             raise ValueError(f"Unknown task: {task}. Use 'embed' or 'reconstruct'.")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert pipeline configuration to a dictionary.
+        
+        This method serializes the pipeline's configuration into a dictionary
+        format that can be used for saving, logging, or reconstruction.
+        
+        Note: The model weights are not included in this dictionary. Use
+        torch.save() to save the actual model weights separately.
+        
+        Returns:
+            Dictionary containing:
+                - model_name: Name of the model architecture
+                - model_class: Class name of the model
+                - device: Device type (cpu, cuda, mps)
+                - device_type: String representation of device
+                - model_config: Model configuration parameters
+                - dtype: Data type of model parameters
+        
+        Example:
+            >>> config_dict = pipeline.to_dict()
+            >>> print(config_dict['model_name'])
+            'mae'
+        """
+        # Get model dtype
+        try:
+            model_dtype = next(self.model.parameters()).dtype
+            dtype_str = str(model_dtype).replace('torch.', '')
+        except StopIteration:
+            dtype_str = 'float32'
+        
+        return {
+            'model_name': self.model_name,
+            'model_class': self.model.__class__.__name__,
+            'device': str(self.device),
+            'model_config': self.model_config,
+            'dtype': dtype_str,
+        }
 
     def __repr__(self) -> str:
         """String representation of the pipeline."""

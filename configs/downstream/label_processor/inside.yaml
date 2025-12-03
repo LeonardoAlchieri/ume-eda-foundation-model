@@ -1,0 +1,7 @@
+# FIXME: do not work here
+_target_: edamame_downstream.label_processor.inside.InsideLabelProcessor
+lower_lower_threshold: downstream.dataset.lower_lower_threshold}
+lower_upper_threshold: downstream.dataset.lower_upper_threshold}
+upper_upper_threshold: downstream.dataset.upper_upper_threshold}
+upper_lower_threshold: downstream.dataset.upper_lower_threshold}
+threshold_type: percentile

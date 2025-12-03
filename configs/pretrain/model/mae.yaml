@@ -1,0 +1,16 @@
+_target_: edamame.model.mae.MaskedAutoencoder
+seq_len: ${pretrain.dataset.segment_length}
+in_channels: 1
+patch_size: 10
+embed_dim: 64
+encoder_depth: 4
+encoder_num_heads: 4
+decoder_embed_dim: 64
+decoder_depth: 4
+decoder_num_heads: 4
+mlp_ratio: 4.0
+mask_ratio: 0.75
+dropout: 0.1
+loss_fn:
+  _target_: edamame.model.loss.DefaultMAELoss
+  masked_weight: 0.7

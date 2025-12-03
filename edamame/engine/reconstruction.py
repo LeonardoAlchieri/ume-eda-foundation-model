@@ -40,6 +40,60 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         x_aug = batch["x_aug"]
         return self.model(x_aug)
 
+    def encode(self, x, mask_ratio=0.0) -> tuple:
+        """
+        Extract encoder embeddings from input data.
+        
+        This method extracts latent representations from the model's encoder
+        without going through the decoder. Useful for downstream tasks or
+        feature extraction.
+        
+        Args:
+            x: Input tensor of shape (batch_size, seq_len, in_channels)
+               Can also be a batch dict with 'x' key
+            mask_ratio: Ratio of patches to mask (default: 0.0 for full encoding).
+                       Set to 0.0 to encode all patches without masking.
+        
+        Returns:
+            Encoder embeddings. The exact shape depends on the model architecture:
+            - For MAE: (batch_size, num_visible_patches, embed_dim) if mask_ratio > 0
+                      or (batch_size, num_patches, embed_dim) if mask_ratio = 0
+            - For other models: model-specific embedding format
+        
+        Example:
+            >>> engine = ReconstructionEngine(model, ...)
+            >>> embeddings = engine.encode(batch_data)
+            >>> # Or with masking
+            >>> embeddings = engine.encode(batch_data, mask_ratio=0.75)
+        """
+        # Handle batch dict format
+        if isinstance(x, dict):
+            x = x["x"]
+        
+        # Ensure model is in eval mode
+        self.model.eval()
+        
+        with torch.no_grad():
+            # Check if model has an encode method
+            if hasattr(self.model, "encode"):
+                # For MAE-like models with explicit encode method
+                if mask_ratio > 0:
+                    # Return embeddings with mask info
+                    embeddings, mask, ids_restore = self.model.encode(x, mask_ratio=mask_ratio)
+                    return embeddings, mask, ids_restore
+                else:
+                    # Return just embeddings when no masking
+                    embeddings, _, _ = self.model.encode(x, mask_ratio=mask_ratio)
+                    return embeddings, None, None
+            elif hasattr(self.model, "get_representation"):
+                # For models with get_representation method (e.g., EfficientNet)
+                return self.model.get_representation(x)
+            else:
+                raise NotImplementedError(
+                    f"Model {self.model.__class__.__name__} does not implement "
+                    "'encode' or 'get_representation' method for embedding extraction."
+                )
+
     def validation_step(self, batch, batch_idx):
         """Validation step with batch storage for plotting."""
         # Store first batch for plotting at epoch end

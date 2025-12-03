@@ -2,5 +2,5 @@
 
 _target_: pytorch_lightning.loggers.CSVLogger
 save_dir: ./lightning_logs.nosync
-name: ${pretrain.experiment_name}
+name: ${experiment_name}
 version: null

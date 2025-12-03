@@ -92,7 +92,7 @@ dataset_scaling_fun:
 hydra:
   mode: MULTIRUN
   sweep:
-    dir: "outputs.nosync/${pretrain.experiment_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
+    dir: "outputs.nosync/${experiment_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
     subdir: "${seed}"
   sweeper:
     grid_params: 

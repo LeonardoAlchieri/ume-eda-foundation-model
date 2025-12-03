@@ -4,12 +4,15 @@ defaults:
   - _self_
   - override /hydra/sweeper: list
 
+
+experiment_name: "Final code with downstream"
+
 # GLOBAL PARAMS
 seed: 42
 segment_length: 240
 channels: 1
 sampling_rate: 4
-device: "mps"
+device: "cuda"
 
 # TODO: implement shift in downstream tasks as well
 
@@ -24,9 +27,7 @@ pretrain:
     dataset_names:
     - BiHeartS
   trainer:
-    # fast_dev_run: 1
-    max_epochs: 2
-    limit_train_batches: 1
+    fast_dev_run: 10
 
 # DOWNSTREAM PARAMS
 downstream:
@@ -45,11 +46,11 @@ downstream:
 
 # SWEEP
 hydra:
-  mode: RUN
+  mode: MULTIRUN
   sweep:
     dir: "outputs.nosync/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
-    subdir: "${model.loss_fn.masked_weight}-${seed}"
+    # subdir: "${pretrain.model.loss_fn.masked_weight}-${seed}"
   sweeper:
     list_params:
       pretrain.model.mask_ratio: 0.0, 0.1, 0.1
-      pretrain.model.loss_fn.masked_weight: 0.0, 0.5, 0.7
+      pretrain.model.loss_fn.masked_weight: 0.0, 0.2, 0.7

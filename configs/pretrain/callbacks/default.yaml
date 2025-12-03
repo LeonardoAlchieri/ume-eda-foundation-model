@@ -1,6 +1,6 @@
 # Default callbacks configuration
 - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-  dirpath: ${hydra:runtime.output_dir}/checkpoints/${pretrain.experiment_name}
+  dirpath: ${hydra:runtime.output_dir}/checkpoints/${experiment_name}
   filename: "{epoch:02d}-{val_loss:.4f}"
   monitor: val_loss
   mode: min

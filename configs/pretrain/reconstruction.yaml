@@ -30,8 +30,8 @@ save_final_checkpoint: true
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 400
-  accelerator: ${device}
-  devices: auto
+  accelerator: cuda
+  devices: [0]
   log_every_n_steps: 10
   deterministic: false
   # gradient_clip_val: 1.0

@@ -95,4 +95,6 @@ venv.bak/
 .DS_Store
 
 # Other
-*.log
+*.log# pixi environments
+.pixi/*
+!.pixi/config.toml

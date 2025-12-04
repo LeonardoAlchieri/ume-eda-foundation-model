@@ -28,7 +28,8 @@ pretrain:
     dataset_names:
     - BiHeartS
   trainer:
-    fast_dev_run: 10
+    fast_dev_run: false
+    devices: [0]
 
 # DOWNSTREAM PARAMS
 downstream:
@@ -46,26 +47,25 @@ downstream:
 
 
 hydra:
-  mode: RUN
+  mode: MULTIRUN
   sweep:
-    dir: "outputs.nosync/${experiment_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
+    dir: "outputs.nosync/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     subdir: "${seed}"
   sweeper:
     grid_params: 
       seed: 42
-      engine.optimizer_kwargs.lr: 0.0005
+      pretrain.engine.optimizer_kwargs.lr: 0.0005
     list_params:
-      model.mbconv_channels:
+      pretrain.model.mbconv_channels:
       - 8
-      # - 64
-      - 128
+      - 64
       # - 128
-      model.embedding_dim:
+      pretrain.model.embedding_dim:
       - 32
       # - 128
-      - 512
+      - 64
       # - 512
-      model.num_mbconv_blocks:
+      pretrain.model.num_mbconv_blocks:
       - 4
       - 8
       # - 12

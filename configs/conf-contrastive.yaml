@@ -1,11 +1,11 @@
 defaults:
-  - pretrain: contrusctive
+  - pretrain: contrastive
   - downstream: default
   - _self_
   - override /hydra/sweeper: list
 
 
-experiment_name: "Final code with downstream"
+experiment_name: "Contrastive (EfficientNet) Shifted windows experiment (BiHeartS) (Downstream)"
 
 # GLOBAL PARAMS
 seed: 42
@@ -24,6 +24,7 @@ pretrain:
       # _target_: edamame.utils.sample_scaling.mean_scaling
       # _partial_: true
     shift: 1
+    segment_length: ${segment_length}
     dataset_names:
     - BiHeartS
   trainer:

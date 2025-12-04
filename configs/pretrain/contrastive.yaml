@@ -9,20 +9,6 @@ defaults:
   - logger: wandb
   - callbacks: default
   - _self_
-  - override /hydra/sweeper: list
-
-experiment_name: "Contrastive (EfficientNet) Shifted windows experiment (BiHeartS) (Downstream)"
-seed: 600
-
-dataset:
-  base_path: "/Users/leonardoalchieri/Desktop/GIT-Mine/datasets_cleaning/data_ready_nolabel.nosync" 
-  channels: 1
-  sample_scaling_method: null
-  segment_length: 240
-  shift: 1
-  dataset_names:
-  - BiHeartS
-
 
 # Save configuration
 save_final_checkpoint: true
@@ -42,8 +28,6 @@ trainer:
   check_val_every_n_epoch: 1
   callbacks: ${pretrain.callbacks}
   limit_train_batches: 3000
-  # fast_dev_run: 2
-  # profiler: simple
 
 # Override dataloader settings
 dataloader:
@@ -89,29 +73,3 @@ engine:
 dataset_scaling_fun:
   _target_: edamame.utils.dataset_scaling.get_empty_scaling_params
   _partial_: true
-
-
-hydra:
-  mode: RUN
-  sweep:
-    dir: "outputs.nosync/${experiment_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
-    # subdir: "${seed}"
-  sweeper:
-    grid_params: 
-      seed: 42
-      engine.optimizer_kwargs.lr: 0.0005
-    list_params:
-      model.mbconv_channels:
-      - 8
-      - 64
-      # - 128
-      # - 128
-      model.embedding_dim:
-      - 32
-      - 128
-      # - 512
-      # - 512
-      model.num_mbconv_blocks:
-      - 4
-      - 8
-      # - 12

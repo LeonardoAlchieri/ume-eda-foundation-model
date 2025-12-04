@@ -326,30 +326,30 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         plt.close(fig)
         print(f"✓ UMAP visualization created for {split} epoch {self.current_epoch}")
 
-    def on_train_epoch_end(self):
-        """
-        Create UMAP visualization of embeddings at the end of training epoch.
-        """
-        self._plot_embedding_visualization(
-            self.train_embeddings, self.train_users, split="train"
-        )
+    # def on_train_epoch_end(self):
+    #     """
+    #     Create UMAP visualization of embeddings at the end of training epoch.
+    #     """
+    #     self._plot_embedding_visualization(
+    #         self.train_embeddings, self.train_users, split="train"
+    #     )
 
-        # Clear storage and counters for next epoch
-        self.train_embeddings = []
-        self.train_users = []
-        self.train_user_counts = {}
+    #     # Clear storage and counters for next epoch
+    #     self.train_embeddings = []
+    #     self.train_users = []
+    #     self.train_user_counts = {}
 
-    def on_validation_epoch_end(self):
-        """
-        Create UMAP visualization of embeddings at the end of validation epoch.
-        """
-        self._plot_embedding_visualization(
-            self.validation_embeddings, self.validation_users, split="val"
-        )
+    # def on_validation_epoch_end(self):
+    #     """
+    #     Create UMAP visualization of embeddings at the end of validation epoch.
+    #     """
+    #     self._plot_embedding_visualization(
+    #         self.validation_embeddings, self.validation_users, split="val"
+    #     )
 
-        # Clear storage and counters for next epoch
-        self.validation_embeddings = []
-        self.validation_users = []
-        self.val_user_counts = {}
+    #     # Clear storage and counters for next epoch
+    #     self.validation_embeddings = []
+    #     self.validation_users = []
+    #     self.val_user_counts = {}
         
     

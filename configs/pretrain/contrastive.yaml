@@ -31,7 +31,7 @@ trainer:
 
 # Override dataloader settings
 dataloader:
-  batch_size: 1024
+  batch_size: 512
   num_workers: 8
   pin_memory: true
   drop_last: true

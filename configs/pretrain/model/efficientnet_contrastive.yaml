@@ -12,7 +12,7 @@ mbconv_channels: 32
 num_mbconv_blocks: 8  # M parameter - number of MBConv1D blocks. Apple used 16!
 head_channels: 128
 embedding_dim: 32
-kernel_size: 10
+kernel_size: 9
 
 # Regularization
 dropout: 0.5

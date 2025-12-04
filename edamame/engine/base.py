@@ -127,7 +127,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             **kwargs,
         )
 
-    def log_figure(self, fig, tag: str, epoch: int):
+    def log_figure(self, fig, tag: str):
         """
         Log a matplotlib figure using Lightning's logger.
         
@@ -143,7 +143,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         # Try different logging methods based on logger type
         if self.logger is None:
             # No logger configured, save to file as fallback
-            self._save_figure_to_file(fig, tag, epoch)
+            self._save_figure_to_file(fig, tag)
             return
             
         if hasattr(self.logger, "experiment"):
@@ -162,7 +162,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             # TensorBoard logger
             if hasattr(experiment, "add_figure"):
                 try:
-                    experiment.add_figure(tag, fig, global_step=epoch)
+                    experiment.add_figure(tag, fig)
                     return
                 except AttributeError:
                     pass
@@ -170,15 +170,15 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         # Other loggers with log_figure method
         if hasattr(self.logger, "log_figure"):
             try:
-                self.logger.log_figure(tag, fig, epoch)
+                self.logger.log_figure(tag, fig)
                 return
             except (AttributeError, TypeError):
                 pass
 
         # Fallback: save to file
-        self._save_figure_to_file(fig, tag, epoch)
+        self._save_figure_to_file(fig, tag)
 
-    def _save_figure_to_file(self, fig, tag: str, step: int):
+    def _save_figure_to_file(self, fig, tag: str, step: int | None = None):
         """
         Fallback method to save figure to file when logger doesn't support figures.
         

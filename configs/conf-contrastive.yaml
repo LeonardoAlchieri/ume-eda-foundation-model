@@ -28,13 +28,8 @@ pretrain:
     dataset_names:
     - BiHeartS
   trainer:
-<<<<<<< HEAD
     fast_dev_run: 10
-    devices: [1]
-=======
-    fast_dev_run: false
     devices: [0]
->>>>>>> 750da0d2a85a89ffaabcd12aa3b843477c6e1cdd
 
 # DOWNSTREAM PARAMS
 downstream:

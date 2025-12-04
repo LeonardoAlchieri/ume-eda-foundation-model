@@ -150,7 +150,7 @@ def downstream(
 
 @hydra.main(
     config_path="./configs",
-    config_name="conf2",  # TODO: change config name
+    config_name="conf",  # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):

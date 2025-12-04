@@ -29,6 +29,7 @@ pretrain:
     - BiHeartS
   trainer:
     fast_dev_run: 10
+    devices: [1]
 
 # DOWNSTREAM PARAMS
 downstream:
@@ -56,17 +57,12 @@ hydra:
       engine.optimizer_kwargs.lr: 0.0005
     list_params:
       model.mbconv_channels:
-      - 8
-      # - 64
-      - 128
-      # - 128
+      - 16
+      - 32
       model.embedding_dim:
       - 32
-      # - 128
-      - 512
-      # - 512
+      - 64
       model.num_mbconv_blocks:
       - 4
       - 8
-      # - 12
 # play later with batch size

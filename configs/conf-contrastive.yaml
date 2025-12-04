@@ -56,13 +56,13 @@ hydra:
       seed: 42
       pretrain.engine.optimizer_kwargs.lr: 0.0005
     list_params:
-      model.mbconv_channels:
+      pretrain.model.mbconv_channels:
       - 16
       - 32
-      model.embedding_dim:
+      pretrain.model.embedding_dim:
       - 32
       - 64
-      model.num_mbconv_blocks:
+      pretrain.model.num_mbconv_blocks:
       - 4
       - 8
 # play later with batch size

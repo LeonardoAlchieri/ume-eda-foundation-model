@@ -210,9 +210,38 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
         ]
 
         if self.sample_scaling_method is not None:
-            raise NotImplementedError(
+            if self.sample_scaling_method.func.__name__ == "min_max_scaling_per_user":
+                maxs: dict[str, float] = {}
+                mins: dict[str, float] = {}
+                for data in all_data:
+                    user_id = data["user"]
+                    
+                    if user_id not in maxs:
+                        maxs[user_id] = -np.inf
+                    if user_id not in mins:
+                        mins[user_id] = np.inf
+                        
+                    if isinstance(self.channels, list) and len(self.channels) > 1:
+                        raise NotImplementedError(
+                            "Sample scaling method not implemented yet for multiple channels"
+                        )
+                        
+                    values = data["data"][..., self.channels]
+                    
+                    min_val = np.min(values, axis=0)
+                    if min_val < mins[user_id]:
+                        mins[user_id] = min_val
+                    
+                    max_val = np.max(values, axis=0)
+                    if max_val > maxs[user_id]:
+                        maxs[user_id] = max_val
+                self.user_maxs = maxs
+                self.user_mins = mins
+                    
+            else:
+                raise NotImplementedError(
                 "Sample scaling method not implemented yet for the new oneline dataset format"
-            )
+                )
             # concatenated_data = self.sample_scaling_method(concatenated_data)
 
         return all_data
@@ -249,7 +278,17 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
             raise IndexError(
                 f"Index {idx} out of range for segment length {self.segment_length}"
             )
-        sample_user_id = torch.tensor(self.data[series_idx]["user"], dtype=torch.long)
+        sample_user_id = self.data[series_idx]["user"]
+        
+        if self.sample_scaling_method is not None:
+            if self.sample_scaling_method.func.__name__ == "min_max_scaling_per_user":
+                segment = (segment - self.user_mins[sample_user_id]) / (self.user_maxs[sample_user_id] - self.user_mins[sample_user_id] + 1e-8)
+            else:
+                raise NotImplementedError(
+                    "Sample scaling method not implemented yet for the new oneline dataset format"
+                )
+        
+        sample_user_id = torch.tensor(sample_user_id, dtype=torch.long)
 
         x = torch.from_numpy(segment).float()
 

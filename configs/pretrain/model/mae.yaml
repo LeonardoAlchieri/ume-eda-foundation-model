@@ -14,3 +14,4 @@ dropout: 0.1
 loss_fn:
   _target_: edamame.model.loss.DefaultMAELoss
   masked_weight: 0.7
+  loss_type: "mae"

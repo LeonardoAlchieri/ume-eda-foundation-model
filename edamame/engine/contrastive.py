@@ -54,6 +54,35 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         x_2 = batch["x_2"]
         return self.model(x_1, x_2)
 
+    def get_representation(self, x):
+        """
+        Extract representation/embedding from input data.
+        
+        This method extracts feature representations from the model's encoder.
+        Useful for downstream tasks, inference, or feature extraction.
+        
+        Args:
+            x: Input tensor of shape (batch_size, seq_len, in_channels)
+               Can also be a batch dict with 'x' key
+        
+        Returns:
+            Embedding tensor of shape (batch_size, embedding_dim)
+        
+        Example:
+            >>> engine = ContrastiveEngine(model, ...)
+            >>> embeddings = engine.get_representation(batch_data)
+        """
+        # Handle batch dict format
+        if isinstance(x, dict):
+            x = x["x"]
+        
+        # Ensure model is in eval mode
+        self.model.eval()
+        
+        with torch.no_grad():
+            # Call the model's get_representation method
+            return self.model.get_representation(x)
+
     def on_after_batch_transfer(self, batch, dataloader_idx):
         """
         Hook called after batch is transferred to device.
@@ -322,3 +351,5 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         self.validation_embeddings = []
         self.validation_users = []
         self.val_user_counts = {}
+        
+    

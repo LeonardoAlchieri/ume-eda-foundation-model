@@ -462,7 +462,7 @@ class EdamamePipeline:
         self.model.eval()
 
         with torch.no_grad():
-            if self.model_name.lower() == "mae":
+            if self.model_name.lower() == "mae" or self.model_name.lower() == "maskedautoencoder":
                 # Use MAE's encode method
                 embeddings, mask, ids_restore = self.model.encode(
                     x, mask_ratio=mask_ratio
@@ -471,7 +471,7 @@ class EdamamePipeline:
                 if return_mask:
                     return embeddings, mask, ids_restore
                 return embeddings
-            elif self.model_name.lower() == "efficientnet":
+            elif self.model_name.lower() == "efficientnet" or self.model_name.lower() == "efficientnetcontrastive":
                 # Use EfficientNet's get_representation method
                 embeddings = self.model.get_representation(x)
                 return embeddings

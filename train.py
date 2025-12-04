@@ -116,6 +116,7 @@ def downstream(
     pretraine_model: BaseSelfSupervisedEngine,
     segment_length_in_s: int,
     lightning_logger: Logger,
+    model_name: str,
 ) -> None:
     experiment_results: dict[str, dict[int, dict]] = dict()
     for dataset in cfg.datasets:
@@ -130,7 +131,7 @@ def downstream(
         datamodule.set_feature_extractor(
             EdamameExtractor(
                 pipeline=pretraine_model,
-                model_name="mae",  # TODO: make this configurable
+                model_name=model_name,  # TODO: make this configurable
                 checkpoint_path=None,
                 device_map=cfg.device,
                 # normalization_fn=cfg.normalization_fn,
@@ -150,7 +151,7 @@ def downstream(
 
 @hydra.main(
     config_path="./configs",
-    config_name="conf",  # TODO: change config name
+    config_name="conf-contrastive",  # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):
@@ -163,6 +164,7 @@ def main(cfg: DictConfig):
             pretraine_model=pretrained_model,
             segment_length_in_s=cfg.segment_length // cfg.sampling_rate,
             lightning_logger=lightning_logger,
+            model_name=cfg.pretrain.engine.model._target_.split(".")[-1],
         )
     except Exception as e:
         logger.error(f"Downstream task failed with exception: {e}")

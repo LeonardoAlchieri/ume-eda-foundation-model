@@ -7,11 +7,11 @@ in_channels: 1
 seq_len: ${pretrain.dataset.segment_length}
 
 # Architecture parameters
-stem_channels: 32
-mbconv_channels: 32
-num_mbconv_blocks: 8  # M parameter - number of MBConv1D blocks. Apple used 16!
-head_channels: 128
-embedding_dim: 32
+stem_channels: 64
+mbconv_channels: 92
+num_mbconv_blocks: 12  # M parameter - number of MBConv1D blocks. Apple used 16!
+head_channels: 248
+embedding_dim: 64
 kernel_size: 9
 
 # Regularization

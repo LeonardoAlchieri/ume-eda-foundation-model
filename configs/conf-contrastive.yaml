@@ -5,7 +5,7 @@ defaults:
   - override /hydra/sweeper: list
 
 
-experiment_name: "Contrastive (EfficientNet) Shifted windows experiment (BiHeartS) (Downstream)"
+experiment_name: "Contrastive SAMPLE WISE (full augment) (EfficientNet) Shifted windows experiment (BiHeartS) (Downstream)"
 
 # GLOBAL PARAMS
 seed: 42
@@ -30,6 +30,9 @@ pretrain:
   trainer:
     fast_dev_run: 10
     devices: [0]
+  model:
+    loss_fn:
+      ignore_keys: true
 
 # DOWNSTREAM PARAMS
 downstream:
@@ -57,6 +60,7 @@ hydra:
       pretrain.engine.optimizer_kwargs.lr: 0.0005
     list_params:
       pretrain.model.mbconv_channels:
+      - 8
       - 16
       - 32
       - 32
@@ -65,6 +69,7 @@ hydra:
       - 64
       - 64
       pretrain.model.num_mbconv_blocks:
+      - 2
       - 4
       - 8
       - 16

@@ -318,10 +318,11 @@ class EdamamePipeline:
         """
         config = {}
 
-        # Infer stem channels
+        # Infer stem channels and kernel size
         if "stem_conv.weight" in state_dict:
             config["in_channels"] = state_dict["stem_conv.weight"].shape[1]
             config["stem_channels"] = state_dict["stem_conv.weight"].shape[0]
+            config["kernel_size"] = state_dict["stem_conv.weight"].shape[2]
 
         # Infer head channels
         if "head_conv.weight" in state_dict:
@@ -341,9 +342,10 @@ class EdamamePipeline:
         if num_mbconv_blocks > 0:
             config["num_mbconv_blocks"] = num_mbconv_blocks
 
-        # Infer mbconv_channels from first MBConv block
-        if "mbconv_blocks.0.expand_conv.weight" in state_dict:
+        # Infer mbconv_channels and kernel size from first MBConv block
+        if "mbconv_blocks.0.project_conv.weight" in state_dict:
             config["mbconv_channels"] = state_dict["mbconv_blocks.0.project_conv.weight"].shape[0]
+        
 
         # Set default values
         config.setdefault("seq_len", 240)

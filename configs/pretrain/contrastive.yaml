@@ -131,10 +131,7 @@ engine:
   optimizer_kwargs:
     lr: 0.0005
     weight_decay: 0.001
-  scheduler_kwargs:
-    T_max: 100
-    eta_min: 0.00001
-
+    
 dataset_scaling_fun:
   _target_: edamame.utils.dataset_scaling.get_empty_scaling_params
   _partial_: true

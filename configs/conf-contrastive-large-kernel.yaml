@@ -1,0 +1,92 @@
+defaults:
+  - pretrain: contrastive
+  - downstream: default
+  - _self_
+  - override /hydra/sweeper: list
+
+
+experiment_name: "Contrastive SAMPLE WISE (full augment) (EfficientNet) Shifted windows experiment (BiHeartS) (Downstream)"
+
+# GLOBAL PARAMS
+seed: 42
+segment_length: 240
+channels: 1
+sampling_rate: 4
+device: "mps"
+
+# PRETRAIN PARAMS
+pretrain:
+  dataset:
+    # base_path: "data_online.nosync" 
+    base_path: "/Users/leonardoalchieri/Desktop/GIT-Mine/datasets_cleaning/data_ready_nolabel.nosync" 
+    sample_scaling_method: null
+      # _target_: edamame.utils.sample_scaling.mean_scaling
+      # _partial_: true
+    shift: 1
+    segment_length: ${segment_length}
+    dataset_names:
+    - APSYNC
+    - BiHeartS
+    - big-ideas-glycemic-wearable
+    - Dynamics
+    - EmpaticaE4Stress
+    - EPM
+    - LAUREATE
+    - MEFAR
+    - M2Sleep
+    - PPG_FieldStudy
+    - SEED
+    - SEED-II-Lab
+    - SEED-II-Wild
+    - Stress Predict Dataset
+    - ToadStool
+    - WEEE
+    - WESD
+    - Workplaces
+  trainer:
+    fast_dev_run: 10
+    devices: [0]
+  model:
+    loss_fn:
+      ignore_keys: true
+
+# DOWNSTREAM PARAMS
+downstream:
+  datasets: 
+    - name: BiHeartS
+      label_name: sleep_wake
+      side: left
+    - name: USILaughs
+      label_name: cognitiveload
+      side: right
+  datamodule:
+    path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
+    recompute_features: true
+    debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+
+
+# hydra:
+#   mode: RUN
+#   sweep:
+#     dir: "outputs.nosync/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
+#     subdir: "${seed}"
+#   sweeper:
+#     grid_params: 
+#       seed: 42
+#       pretrain.engine.optimizer_kwargs.lr: 0.0005
+#     list_params:
+#       pretrain.model.mbconv_channels:
+#       - 8
+#       - 16
+#       - 32
+#       - 32
+#       pretrain.model.embedding_dim:
+#       - 32
+#       - 64
+#       - 64
+#       pretrain.model.num_mbconv_blocks:
+#       - 2
+#       - 4
+#       - 8
+#       - 16
+# # play later with batch size

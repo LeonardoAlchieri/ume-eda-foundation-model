@@ -71,6 +71,8 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
 
         # Load all data
         self.data = self._load_data()
+        if len(self.data) == 0:
+            raise ValueError("No data loaded. Please check the dataset paths.")
         self._set_index_mapping()
 
         self.train_val_test_size = train_val_test_size
@@ -155,7 +157,7 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
         """
         all_data: list = []
 
-        for dataset_name in self.dataset_names:
+        for dataset_name in tqdm(self.dataset_names, desc="Loading datasets", position=0):
             dataset_path = self.base_path / dataset_name
 
             if not dataset_path.exists():
@@ -163,7 +165,9 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
                 continue
 
             # Check if file_pattern is a specific file or a glob pattern
-            file_paths = dataset_path.glob("*.h5")
+            file_paths = list(dataset_path.glob("*.h5"))
+            if len(file_paths) == 0:
+                raise ValueError(f"No .h5 files found for dataset {dataset_name}")
 
             # Load each file
             for file_path in file_paths:
@@ -174,7 +178,7 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
                     # Get all keys in the store
                     keys = store.keys()
 
-                    for key in tqdm(keys, desc=f"Loading {file_path.name}"):
+                    for key in tqdm(keys, desc=f"Loading {file_path.name}", position=1):
                         # Load the data
                         data_df = store.get(key)
 
@@ -182,7 +186,11 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
 
                         # Load metadata from attributes
                         metadata = store.get_storer(key).attrs.metadata
-
+                        if metadata["len_data"] < self.segment_length:
+                            logger.warning(
+                                f"Data length {metadata['len_data']} is less than segment length {self.segment_length}. Skipping."
+                            )
+                            continue
                         # Append to all_data
                         all_data.append(
                             {

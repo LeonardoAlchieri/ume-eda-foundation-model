@@ -100,14 +100,15 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
                 device = x.device
 
                 # Vectorized augmentation function
-                augment_fn = np.vectorize(
-                    self.data_augmentation,
-                    signature="(t)->(t)" if len(x.shape) == 2 else "(t,c)->(t,c)",
-                )
-
+                augment_fn = np.vectorize(self.data_augmentation,signature="(t)->(t)")
+                if x_np.ndim == 3:
+                    x_np = x_np.transpose(0,2,1)  # (batch, channels, time)
                 # Apply augmentation in a vectorized way
                 batch_aug_1_np = augment_fn(x_np)
                 batch_aug_2_np = augment_fn(x_np)
+                if x_np.ndim == 3:
+                    batch_aug_1_np = batch_aug_1_np.transpose(0,2,1)  # Back to (batch, time, channels)
+                    batch_aug_2_np = batch_aug_2_np.transpose(0,2,1)
 
                 # Convert back to tensor
                 batch_aug_1 = torch.from_numpy(batch_aug_1_np).float().to(device)

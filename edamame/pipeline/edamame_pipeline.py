@@ -379,14 +379,34 @@ class EdamamePipeline:
             decoder_embed_dim = state_dict["decoder_pos_embed"].shape[2]
             config["decoder_embed_dim"] = decoder_embed_dim
 
-        # Infer patch size and channels from decoder prediction layer
-        if "decoder_pred.weight" in state_dict:
-            patch_channels_product = state_dict["decoder_pred.weight"].shape[0]
-            # Assume default values if we can't infer
-            config["patch_size"] = 10  # default
-            config["in_channels"] = 1  # default
+        # Infer patch size and in_channels from patch embedding layer
+        # patch_embed.projection.weight has shape (embed_dim, patch_size * in_channels)
+        if "patch_embed.projection.weight" in state_dict:
+            patch_channels_product = state_dict["patch_embed.projection.weight"].shape[1]
+            
+            # Try to infer from decoder_pred as well (has shape: patch_size * in_channels, decoder_embed_dim)
+            if "decoder_pred.weight" in state_dict:
+                decoder_pred_input = state_dict["decoder_pred.weight"].shape[0]
+                # Both should give us patch_size * in_channels
+                patch_channels_product = decoder_pred_input
+            
+            # Common patch sizes to try (in order of preference)
+            for patch_size in [10, 8, 5, 4, 2, 1, 16, 20]:
+                if patch_channels_product % patch_size == 0:
+                    in_channels = patch_channels_product // patch_size
+                    config["patch_size"] = patch_size
+                    config["in_channels"] = in_channels
+                    break
+            else:
+                # Fallback: assume patch_size=10 and calculate in_channels
+                config["patch_size"] = 10
+                config["in_channels"] = max(1, patch_channels_product // 10)
+        else:
+            # Fallback to defaults if we can't infer
+            config["patch_size"] = 10
+            config["in_channels"] = 1
 
-        # Infer sequence length from number of patches (assuming patch_size=10)
+        # Infer sequence length from number of patches
         if "pos_embed" in state_dict and "patch_size" in config:
             num_patches = state_dict["pos_embed"].shape[1]
             config["seq_len"] = num_patches * config["patch_size"]

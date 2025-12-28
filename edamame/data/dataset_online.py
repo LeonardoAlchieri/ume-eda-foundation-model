@@ -219,30 +219,29 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
 
         if self.sample_scaling_method is not None:
             if self.sample_scaling_method.func.__name__ == "min_max_scaling_per_user":
-                maxs: dict[str, float] = {}
-                mins: dict[str, float] = {}
+                maxs: dict[int, np.ndarray] = {}
+                mins: dict[int, np.ndarray] = {}
                 for data in all_data:
                     user_id = data["user"]
                     
-                    if user_id not in maxs:
-                        maxs[user_id] = -np.inf
-                    if user_id not in mins:
-                        mins[user_id] = np.inf
-                        
-                    if isinstance(self.channels, list) and len(self.channels) > 1:
-                        raise NotImplementedError(
-                            "Sample scaling method not implemented yet for multiple channels"
-                        )
-                        
                     values = data["data"][..., self.channels]
                     
-                    min_val = np.min(values, axis=0)
-                    if min_val < mins[user_id]:
-                        mins[user_id] = min_val
+                    # Ensure values is 2D (time, channels) for consistent handling
+                    if values.ndim == 1:
+                        values = values[:, np.newaxis]
                     
-                    max_val = np.max(values, axis=0)
-                    if max_val > maxs[user_id]:
-                        maxs[user_id] = max_val
+                    # Compute min/max per channel (axis=0 reduces over time)
+                    min_val = np.min(values, axis=0)  # shape: (num_channels,)
+                    max_val = np.max(values, axis=0)  # shape: (num_channels,)
+                    
+                    if user_id not in maxs:
+                        maxs[user_id] = max_val.copy()
+                        mins[user_id] = min_val.copy()
+                    else:
+                        # Element-wise min/max across channels
+                        mins[user_id] = np.minimum(mins[user_id], min_val)
+                        maxs[user_id] = np.maximum(maxs[user_id], max_val)
+                        
                 self.user_maxs = maxs
                 self.user_mins = mins
                     

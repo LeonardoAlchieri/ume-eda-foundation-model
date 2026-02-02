@@ -19,7 +19,7 @@ device: "cuda"
 # PRETRAIN PARAMS
 pretrain:
   dataset:
-    base_path: "/Users/leonardoalchieri/Desktop/GIT-Mine/datasets_cleaning/data_ready_nolabel.nosync" 
+    base_path: "../data_ready_nolabel.nosync" 
     sample_scaling_method: null
       # _target_: edamame.utils.sample_scaling.mean_scaling
       # _partial_: true
@@ -39,7 +39,7 @@ downstream:
       label_name: cognitiveload
       side: right
   datamodule:
-    path_to_data: "/Users/leonardoalchieri/Desktop/GIT-Mine/pretrained_foundation_models_physiological_data/data.nosync"
+    path_to_data: "../data.nosync"
     recompute_features: true
     debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
 

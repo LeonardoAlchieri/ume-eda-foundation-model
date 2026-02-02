@@ -1,6 +1,6 @@
 _target_: edamame_downstream.feature_extraction.edamame.EdamameExtractor
 model_name: "efficientnet"
-checkpoint_path: "/Users/leonardoalchieri/Desktop/GIT-Mine/pretrained_foundation_models_physiological_data/artifacts.nosync/EfficientNet-phasic-BiHeartS-slidingwindow.ckpt"
+checkpoint_path: "~/pretrained_foundation_models_physiological_data/artifacts.nosync/EfficientNet-phasic-BiHeartS-slidingwindow.ckpt"
 device_map: ${device_map}
 # torch_dtype: "auto"
 aggregator: ${aggregator}

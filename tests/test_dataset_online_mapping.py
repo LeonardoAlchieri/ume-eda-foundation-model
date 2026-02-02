@@ -23,7 +23,7 @@ class TestDatasetOnlineMapping:
 
     def dataset_path(self):
         """Path to test dataset."""
-        return Path("/Users/leonardoalchieri/Desktop/GIT-Mine/datasets_cleaning/data_ready_nolabel.nosync/BiHeartS")
+        return Path("../datasets_cleaning/data_ready_nolabel.nosync/BiHeartS")
 
     def dataset(self, dataset_path):
         """Create dataset instance."""

@@ -70,6 +70,9 @@ def pre_train(cfg: DictConfig) -> tuple[BaseSelfSupervisedEngine, Logger]:
     #     # trainer.test(engine, test_loader, ckpt_path="best")
 
     #     # TODO: load the best model before return the engine
+    
+    breakpoint()
+    trainer.save_checkpoint("last_checkpoint.ckpt")
     return engine, trainer.logger
 
 
@@ -151,7 +154,7 @@ def downstream(
 
 @hydra.main(
     config_path="./configs",
-    config_name="conf-contrastive",  # TODO: change config name
+    config_name="conf-contrastive-small-kernel",  # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):

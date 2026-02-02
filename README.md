@@ -73,7 +73,6 @@ Install the package with pip:
 
 ```bash
 # Clone the repository
-git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
 cd eda-foundation-models
 
 # Install in editable mode (recommended for development)

@@ -2,6 +2,7 @@
 .DS_Store
 tables*
 lightning_logs/
+.pixi
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

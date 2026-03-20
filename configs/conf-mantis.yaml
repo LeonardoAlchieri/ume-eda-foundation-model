@@ -1,0 +1,57 @@
+defaults:
+  - pretrain: mantis
+  - downstream: default
+  - _self_
+  - override /hydra/sweeper: list
+
+project_name: EDAMAME-pretrain-postsubmission
+group_name: "finetune-mantis-alldata-${channels}-contrastive"
+# group naming convention: pretrain vs finetune - model/architecture name - datasets - channels - pretrain method (e.g. reconstruction)
+
+run_name: "TESTING"
+
+# GLOBAL PARAMS
+seed: 42
+segment_length: 240
+channels: [0,1,2]
+sampling_rate: 4
+device: "mps"
+
+# TODO: implement shift in downstream tasks as well
+
+# PRETRAIN PARAMS
+pretrain:
+  dataset:
+    base_path: "../datasets_cleaning/data_ready_nolabel.nosync" 
+    sample_scaling_method: null
+    shift: 1
+    dataset_names:
+    - BiHeartS
+  trainer:
+    fast_dev_run: false
+
+# DOWNSTREAM PARAMS
+downstream:
+  datasets: 
+    # - name: BiHeartS
+    #   label_name: sleep_wake
+    #   side: left
+    - name: USILaughs
+      label_name: cognitiveload
+      side: right
+  datamodule:
+    path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
+    recompute_features: true
+    debug: true # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+
+
+# SWEEP
+# hydra:
+#   mode: MULTIRUN
+#   sweep:
+#     dir: "outputs.nosync/${run_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
+#     # subdir: "${pretrain.model.loss_fn.masked_weight}-${seed}"
+#   sweeper:
+#     list_params:
+#       pretrain.model.mask_ratio: 0.0, 0.1, 0.1
+#       pretrain.model.loss_fn.masked_weight: 0.0, 0.2, 0.7

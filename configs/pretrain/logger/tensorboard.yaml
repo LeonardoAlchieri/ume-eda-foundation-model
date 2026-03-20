@@ -2,6 +2,6 @@
 
 _target_: pytorch_lightning.loggers.TensorBoardLogger
 save_dir: ./tensorboard_logs.nosync
-name: ${experiment_name}
+name: ${run_name}
 version: null
 default_hp_metric: false

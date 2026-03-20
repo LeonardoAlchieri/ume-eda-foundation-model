@@ -11,7 +11,7 @@ defaults:
   - _self_
   - override /hydra/sweeper: list
 
-experiment_name: "MAE Shifted windows experiment (BiHeartS)"
+run_name: "MAE Shifted windows experiment (BiHeartS)"
 seed: 600
 
 dataset:
@@ -94,7 +94,7 @@ dataset_scaling_fun:
 hydra:
   mode: RUN
   sweep:
-    dir: "outputs.nosync/${experiment_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
+    dir: "outputs.nosync/${run_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
     subdir: "${seed}"
   sweeper:
     grid_params: 

@@ -88,7 +88,7 @@ class EdamamePipeline:
         Load a pretrained model from checkpoint.
 
         Args:
-            model_name: Name of the model architecture (e.g., "mae", "efficientnet")
+            model_name: Name of the model architecture (e.g., "mae", "efficientnet", "mantis")
             weights_path: Path to the checkpoint file (.ckpt)
             model_config: Path to model config file or config dict.
                          If None, will try to extract from checkpoint.
@@ -131,9 +131,11 @@ class EdamamePipeline:
             model = cls._load_mae_model(config_dict, checkpoint, torch_dtype)
         elif model_name.lower() == "efficientnet":
             model = cls._load_efficientnet_model(config_dict, checkpoint, torch_dtype)
+        elif model_name.lower() == "mantis":
+            model = cls._load_mantis_model(config_dict, checkpoint, torch_dtype)
         else:
             raise ValueError(
-                f"Model '{model_name}' not supported. Currently supported: 'mae', 'efficientnet'."
+                f"Model '{model_name}' not supported. Currently supported: 'mae', 'efficientnet', 'mantis'."
             )
 
         # Create pipeline instance
@@ -304,6 +306,85 @@ class EdamamePipeline:
         return model
 
     @staticmethod
+    def _load_mantis_model(
+        config_dict: Dict[str, Any],
+        checkpoint: Dict[str, Any],
+        torch_dtype: Optional[torch.dtype] = None,
+    ) -> nn.Module:
+        """
+        Load Mantis contrastive model.
+
+        Args:
+            config_dict: Model configuration
+            checkpoint: Loaded checkpoint
+            torch_dtype: Data type for model
+
+        Returns:
+            Loaded Mantis model
+        """
+        from edamame.model.mantis_contrastive import MantisContrastive
+        import torch.nn as nn
+
+        # Extract state dict - handle different checkpoint formats
+        if "state_dict" in checkpoint:
+            state_dict = checkpoint["state_dict"]
+            # Remove 'model.' prefix if present
+            state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
+        else:
+            state_dict = checkpoint
+
+        # Infer model parameters from state dict if config is empty
+        if not config_dict:
+            config_dict = EdamamePipeline._infer_mantis_config_from_state_dict(state_dict)
+
+        # Ensure loss_fn exists (required by init but not used in eval)
+        if "loss_fn" not in config_dict:
+            config_dict["loss_fn"] = nn.Identity()
+
+        if "pre_training" not in config_dict:
+            config_dict["pre_training"] = False
+
+        if "load_pretrained" not in config_dict:
+            config_dict["load_pretrained"] = False
+
+        # Create model
+        model = MantisContrastive(**config_dict)
+
+        # Load weights
+        model.load_state_dict(state_dict, strict=False)
+
+        # Convert dtype if specified
+        if torch_dtype is not None:
+            model = model.to(dtype=torch_dtype)
+
+        return model
+
+    @staticmethod
+    def _infer_mantis_config_from_state_dict(
+        state_dict: Dict[str, torch.Tensor],
+    ) -> Dict[str, Any]:
+        """
+        Infer Mantis configuration from state dictionary.
+
+        Args:
+            state_dict: Model state dictionary
+
+        Returns:
+            Inferred configuration dictionary
+        """
+        config = {}
+        
+        # Look for architecture specific keys
+        if any("mantis.V2" in k for k in state_dict.keys()):
+            config["architecture"] = "MantisV2"
+        elif any("mantis.V1" in k for k in state_dict.keys()):
+            config["architecture"] = "MantisV1"
+        else:
+            config["architecture"] = "Mantis8M"
+            
+        return config
+
+    @staticmethod
     def _infer_efficientnet_config_from_state_dict(
         state_dict: Dict[str, torch.Tensor],
     ) -> Dict[str, Any]:
@@ -450,6 +531,7 @@ class EdamamePipeline:
         inference to get embeddings of the full input.
         
         For EfficientNet models, this returns the embedding from the encoder.
+        For Mantis models, this returns the embedding from the encoder.
 
         Args:
             x: Input tensor of shape (batch_size, seq_len, in_channels)
@@ -461,13 +543,13 @@ class EdamamePipeline:
 
         Returns:
             Embeddings tensor of shape (batch_size, num_visible_patches, embed_dim) for MAE
-            or (batch_size, embedding_dim) for EfficientNet
+            or (batch_size, embedding_dim) for EfficientNet and Mantis
             or tuple of (embeddings, mask, ids_restore) if return_mask=True (MAE only)
 
         Example:
             >>> embeddings = pipeline.embed(batch_data)
             >>> # Get shape: (batch_size, num_patches, embed_dim) for MAE
-            >>> # Get shape: (batch_size, embedding_dim) for EfficientNet
+            >>> # Get shape: (batch_size, embedding_dim) for EfficientNet and Mantis
         """
         # Ensure input is a tensor
         if not isinstance(x, torch.Tensor):
@@ -493,8 +575,8 @@ class EdamamePipeline:
                 if return_mask:
                     return embeddings, mask, ids_restore
                 return embeddings
-            elif self.model_name.lower() == "efficientnet" or self.model_name.lower() == "efficientnetcontrastive":
-                # Use EfficientNet's get_representation method
+            elif self.model_name.lower() in ["efficientnet", "efficientnetcontrastive", "mantis", "mantiscontrastive"]:
+                # Use get_representation method for contrastive models
                 embeddings = self.model.get_representation(x)
                 return embeddings
             else:
@@ -513,7 +595,7 @@ class EdamamePipeline:
         For MAE models, this performs the full forward pass: encode with masking,
         then decode to reconstruct the original signal.
         
-        Note: This method is only available for MAE models. EfficientNet models
+        Note: This method is only available for MAE models. EfficientNet and Mantis models
         do not support reconstruction.
         
         Important: If a normalization function is provided, the reconstruction

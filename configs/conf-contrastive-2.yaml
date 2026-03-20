@@ -5,7 +5,7 @@ defaults:
   - override /hydra/sweeper: list
 
 
-experiment_name: "Contrastive SAMPLE WISE (full augment) (EfficientNet) Shifted windows experiment (BiHeartS) (Downstream)"
+run_name: "Contrastive SAMPLE WISE (full augment) (EfficientNet) Shifted windows experiment (BiHeartS) (Downstream)"
 
 # GLOBAL PARAMS
 seed: 42
@@ -52,7 +52,7 @@ downstream:
 hydra:
   mode: RUN
   sweep:
-    dir: "outputs.nosync/${experiment_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
+    dir: "outputs.nosync/${run_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     subdir: "${seed}"
   sweeper:
     grid_params: 

@@ -1,0 +1,30 @@
+# ResNet-based contrastive model configuration
+
+_target_: edamame.model.resnet_contrastive.ResNetContrastive
+
+# Input specifications
+in_channels: 1
+seq_len: ${pretrain.dataset.segment_length}
+
+# Architecture parameters
+stem_channels: 64
+stem_kernel_size: 15
+stem_stride: 2
+kernel_size: 7
+
+# ResNet configuration (ResNet-18 style)
+block_type: "basic"  # "basic" or "bottleneck"
+num_blocks: [2, 2, 2, 2]  # Number of blocks per stage
+channels: [64, 128, 256, 512]  # Output channels per stage
+
+# Embedding
+embedding_dim: 64
+
+# Regularization
+dropout: 0.3
+
+# Loss function configuration
+loss_fn:
+  _target_: edamame.model.loss.contrastive.NCELoss
+  temperature: 0.1
+  ignore_keys: false

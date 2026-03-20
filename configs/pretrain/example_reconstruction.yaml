@@ -15,7 +15,7 @@ defaults:
 segment_length_in_seconds: 60
 sampling_rate: 4
 segment_length: 240
-experiment_name: "${pretrain.model._target_}__${pretrain.model.loss_fn._target_}__${pretrain.dataset.dataset_names}_${segment_length_in_seconds}s"
+run_name: "${pretrain.model._target_}__${pretrain.model.loss_fn._target_}__${pretrain.dataset.dataset_names}_${segment_length_in_seconds}s"
 seed: 600
 
 

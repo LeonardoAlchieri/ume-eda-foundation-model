@@ -10,9 +10,11 @@ This module provides PyTorch Lightning engines for different SSL paradigms:
 from edamame.engine.base import BaseSelfSupervisedEngine
 from edamame.engine.reconstruction import ReconstructionEngine
 from edamame.engine.contrastive import ContrastiveEngine
+from edamame.engine.mantis_contrastive import MantisContrastiveEngine
 
 __all__ = [
     "BaseSelfSupervisedEngine",
     "ReconstructionEngine",
     "ContrastiveEngine",
+    "MantisContrastiveEngine",
 ]

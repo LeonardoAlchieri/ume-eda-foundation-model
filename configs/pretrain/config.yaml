@@ -10,7 +10,7 @@ defaults:
   - _self_
 
 # Experiment settings
-experiment_name: eda_ssl_training
+run_name: eda_ssl_training
 seed: 42
 
 # Save configuration

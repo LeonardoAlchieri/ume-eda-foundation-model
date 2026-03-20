@@ -16,7 +16,7 @@ defaults:
 segment_length_in_seconds: 60
 sampling_rate: 4
 segment_length: 240
-experiment_name: "[EfficientNet Contrastive, User-pair] Explore: lr, batch size and dimensionality"
+run_name: "[EfficientNet Contrastive, User-pair] Explore: lr, batch size and dimensionality"
 seed: 600
 
 dataset:
@@ -92,7 +92,7 @@ dataset_scaling_fun:
 hydra:
   mode: MULTIRUN
   sweep:
-    dir: "outputs.nosync/${experiment_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
+    dir: "outputs.nosync/${run_name}/multirun_${pretrain.now:%Y-%m-%d}-${pretrain.now:%H-%M-%S}"
     subdir: "${seed}"
   sweeper:
     grid_params: 

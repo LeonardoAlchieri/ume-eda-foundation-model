@@ -1,6 +1,6 @@
 model: 
     _target_: xgboost.XGBClassifier
-    device: ${device}
+    device: ${accelerator}
     n_jobs: 8
     seed: ${seed}
 param_grid:

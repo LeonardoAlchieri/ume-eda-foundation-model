@@ -11,7 +11,7 @@ output_token: "cls_token"
 return_transf_layer: -1
 freeze_backbone: false
 channels_strategy: "concat"
-device: ${device}
+device: ${accelerator}
 
 loss_fn:
   _target_: edamame.model.loss.contrastive.NCELoss

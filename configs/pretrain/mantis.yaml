@@ -13,9 +13,9 @@ save_final_checkpoint: true
 
 trainer:
   _target_: pytorch_lightning.Trainer
-  max_epochs: 2
-  accelerator: auto
-  devices: auto
+  max_epochs: 100
+  accelerator: ${accelerator}
+  devices: ${device_num}
   log_every_n_steps: 10
   deterministic: false
   accumulate_grad_batches: 1
@@ -23,8 +23,6 @@ trainer:
   logger: ${pretrain.logger}
   check_val_every_n_epoch: 1
   callbacks: ${pretrain.callbacks}
-  limit_train_batches: 3
-  limit_val_batches: 3
 
 engine:
   base_learning_rate: 0.002

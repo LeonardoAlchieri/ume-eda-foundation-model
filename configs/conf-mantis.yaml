@@ -15,7 +15,9 @@ seed: 42
 segment_length: 240
 channels: [0,1,2]
 sampling_rate: 4
-device: "mps"
+accelerator: "mps"
+device_num: auto
+
 
 # TODO: implement shift in downstream tasks as well
 
@@ -28,7 +30,7 @@ pretrain:
     dataset_names:
     - BiHeartS
   trainer:
-    fast_dev_run: false
+    fast_dev_run: 10
 
 # DOWNSTREAM PARAMS
 downstream:

@@ -7,6 +7,7 @@ import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.loggers import Logger
+import torch
 from torch.utils.data import DataLoader
 
 from edamame.engine import BaseSelfSupervisedEngine
@@ -65,14 +66,34 @@ def pre_train(cfg: DictConfig) -> tuple[BaseSelfSupervisedEngine, Logger]:
     except Exception as e:
         logger.error(f"Training failed with exception: {e}")
         raise e
-    # finally:
-    #     print("NO TESTING")
-    #     # trainer.test(engine, test_loader, ckpt_path="best")
+    print("NO TESTING")
+    # trainer.test(engine, test_loader, ckpt_path="best")
 
-    #     # TODO: load the best model before return the engine
+
+    if getattr(trainer, "checkpoint_callback", None) is not None:
+        best_model_path = trainer.checkpoint_callback.best_model_path
+
+    if not best_model_path:
+        for callback in getattr(trainer, "callbacks", []):
+            if getattr(callback, "best_model_path", ""):
+                best_model_path = callback.best_model_path
+                break
+
+    if best_model_path and Path(best_model_path).is_file():
+        checkpoint = torch.load(best_model_path, map_location="cpu")
+        state_dict = checkpoint.get("state_dict", checkpoint)
+        missing_keys, unexpected_keys = engine.load_state_dict(state_dict, strict=False)
+        if missing_keys or unexpected_keys:
+            logger.warning(
+                "Loaded best checkpoint with non-strict matching. "
+                f"Missing keys: {missing_keys}. Unexpected keys: {unexpected_keys}."
+            )
+        logger.info(f"Loaded best model weights from checkpoint: {best_model_path}")
+    else:
+        logger.warning(
+            "No best checkpoint found. Returning engine with current in-memory weights."
+        )
     
-    breakpoint()
-    trainer.save_checkpoint("last_checkpoint.ckpt")
     return engine, trainer.logger
 
 

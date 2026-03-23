@@ -10,7 +10,8 @@ defaults:
   - trainable_feature_extractor: none
 
 sampling_rate: ${sampling_rate}
-device: ${device}
+device: ${accelerator}
+batch_size: ${pretrain.dataloader.batch_size}
 
 datamodule:
   _target_: edamame_downstream.data.EDADataset

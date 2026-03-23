@@ -159,7 +159,7 @@ def downstream(
                 checkpoint_path=None,
                 device_map=cfg.device,
                 # normalization_fn=cfg.normalization_fn,
-                batch_size=1024,
+                batch_size=cfg.batch_size,  
             )
         )
 

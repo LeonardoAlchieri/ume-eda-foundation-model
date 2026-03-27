@@ -96,58 +96,71 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
                     batch["x"] = self.apply_scaling(batch["x"])
                 x = batch["x"]
 
-                def _augment_series_1d(series: torch.Tensor) -> torch.Tensor:
-                    """Apply one augmentation to a single 1D time series."""
-                    try:
-                        augmented = self.data_augmentation(series)
-                    except (TypeError, ValueError, RuntimeError):
-                        # Compatibility fallback for legacy numpy-based augmenters.
-                        augmented = self.data_augmentation(series.detach().cpu().numpy())
-
-                    if torch.is_tensor(augmented):
-                        augmented_t = augmented.to(device=series.device, dtype=series.dtype)
-                    elif isinstance(augmented, np.ndarray):
-                        augmented_t = torch.from_numpy(augmented).to(device=series.device, dtype=series.dtype)
+                def _to_tensor_like_input(augmented_output, input_x: torch.Tensor) -> torch.Tensor:
+                    if torch.is_tensor(augmented_output):
+                        augmented_t = augmented_output.to(device=input_x.device, dtype=input_x.dtype)
+                    elif isinstance(augmented_output, np.ndarray):
+                        augmented_t = torch.from_numpy(augmented_output).to(
+                            device=input_x.device,
+                            dtype=input_x.dtype,
+                        )
                     else:
                         raise TypeError(
                             "Data augmentation must return a torch.Tensor or numpy.ndarray, "
-                            f"got {type(augmented)}"
+                            f"got {type(augmented_output)}"
                         )
 
-                    if augmented_t.ndim != 1 or augmented_t.shape[0] != series.shape[0]:
+                    if augmented_t.shape != input_x.shape:
                         raise ValueError(
-                            "Data augmentation must preserve 1D time-series shape. "
-                            f"Expected ({series.shape[0]},), got {tuple(augmented_t.shape)}"
+                            "Data augmentation must preserve input shape. "
+                            f"Expected {tuple(input_x.shape)}, got {tuple(augmented_t.shape)}"
                         )
 
                     return augmented_t
 
-                def _augment_batch_tensor(input_x: torch.Tensor) -> torch.Tensor:
-                    """
-                    Apply augmentation independently to each 1D time series.
-                    Supports input shapes (B, T) and (B, T, C).
-                    """
-                    if input_x.ndim == 2:
-                        # (batch, time)
-                        flat = input_x
-                        augmented_flat = [_augment_series_1d(series) for series in flat]
-                        return torch.stack(augmented_flat, dim=0)
+                def _apply_batch_augmentation(input_x: torch.Tensor) -> torch.Tensor:
+                    errors = []
 
-                    if input_x.ndim == 3:
-                        # (batch, time, channels) -> apply per (time,) channel-series
-                        bsz, t_steps, n_channels = input_x.shape
-                        flat = input_x.permute(0, 2, 1).reshape(-1, t_steps)
-                        augmented_flat = [_augment_series_1d(series) for series in flat]
-                        stacked = torch.stack(augmented_flat, dim=0)
-                        return stacked.reshape(bsz, n_channels, t_steps).permute(0, 2, 1).contiguous()
+                    # 1) Native torch/batched API
+                    try:
+                        augmented = self.data_augmentation(input_x)
+                        return _to_tensor_like_input(augmented, input_x)
+                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
+                        errors.append(f"torch-call failed: {err}")
 
-                    raise ValueError(
-                        f"Unsupported input shape for data augmentation: {tuple(input_x.shape)}. "
-                        "Expected (B, T) or (B, T, C)."
+                    # 2) Batch-dict API (used by some wrappers)
+                    try:
+                        augmented = self.data_augmentation({"x": input_x})
+                        if isinstance(augmented, dict) and "x" in augmented:
+                            return _to_tensor_like_input(augmented["x"], input_x)
+                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
+                        errors.append(f"dict-torch-call failed: {err}")
+
+                    input_np = input_x.detach().cpu().numpy()
+
+                    # 3) Legacy numpy API on full batch
+                    try:
+                        augmented = self.data_augmentation(input_np)
+                        return _to_tensor_like_input(augmented, input_x)
+                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
+                        errors.append(f"numpy-call failed: {err}")
+
+                    # 4) Legacy dict-numpy API
+                    try:
+                        augmented = self.data_augmentation({"x": input_np})
+                        if isinstance(augmented, dict) and "x" in augmented:
+                            return _to_tensor_like_input(augmented["x"], input_x)
+                        return _to_tensor_like_input(augmented, input_x)
+                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
+                        errors.append(f"dict-numpy-call failed: {err}")
+
+                    raise RuntimeError(
+                        "Could not apply data augmentation on the full batch. "
+                        + " | ".join(errors)
                     )
 
-                batch_aug_1 = _augment_batch_tensor(x)
-                batch_aug_2 = _augment_batch_tensor(x)
+                batch_aug_1 = _apply_batch_augmentation(x)
+                batch_aug_2 = _apply_batch_augmentation(x)
 
                 batch["x_1"] = batch_aug_1
                 batch["x_2"] = batch_aug_2

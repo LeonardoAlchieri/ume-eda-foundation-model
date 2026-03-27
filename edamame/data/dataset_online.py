@@ -28,6 +28,7 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
     Args:
         base_path: Base directory path containing the dataset folders
         dataset_names: List of dataset folder names to load
+        subsample: Optional fraction of available samples to keep (0 < subsample <= 1)
         shuffle: Whether to shuffle the data after loading
         seed: Random seed for shuffling (for reproducibility)
         channels: Channel indices to select. Can be:
@@ -50,6 +51,7 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
         dataset_names: List[str],
         segment_length: int,
         shift: Optional[int] = 1,
+        subsample: Optional[float] = None,
         shuffle: bool = True,
         train_val_test_size: Optional[tuple] = None,
         seed: Optional[int] = None,
@@ -62,6 +64,9 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
         self.dataset_names = self._check_dataset_names(dataset_names)
         self.segment_length = segment_length
         self.shift = shift
+        self.subsample = subsample
+        if self.subsample is not None and not (0 < self.subsample <= 1):
+            raise ValueError("subsample must be in the range (0, 1].")
 
         self.shuffle = shuffle
         self.seed = seed
@@ -137,6 +142,32 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
         idx_to_position = np.concatenate(
             [np.arange(0, count * self.shift, self.shift) for count in sample_counts]
         )
+
+        if self.subsample is not None:
+            num_total = len(idx_to_series)
+            num_keep = max(1, int(num_total * self.subsample))
+            if num_keep < num_total:
+                if self.shuffle:
+                    rng = np.random.default_rng(self.seed)
+                    keep_idx = rng.choice(num_total, size=num_keep, replace=False)
+                else:
+                    keep_idx = np.arange(num_keep)
+                idx_to_series = idx_to_series[keep_idx]
+                idx_to_position = idx_to_position[keep_idx]
+                logger.info(
+                    "Subsample active: keeping %d/%d samples (%.2f%%), shuffle=%s, seed=%s",
+                    num_keep,
+                    num_total,
+                    100 * num_keep / num_total,
+                    self.shuffle,
+                    self.seed,
+                )
+            else:
+                logger.info(
+                    "Subsample active: keeping all %d samples (subsample=%s).",
+                    num_total,
+                    self.subsample,
+                )
 
         if len(idx_to_series) != len(idx_to_position):
             raise ValueError("Index mapping arrays have mismatched lengths.")

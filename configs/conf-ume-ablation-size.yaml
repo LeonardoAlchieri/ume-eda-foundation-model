@@ -8,7 +8,7 @@ project_name: EDAMAME-pretrain-postsubmission
 group_name: "ablation-modelsize-ume-alldata-${channels}-contrastive"
 # group naming convention: pretrain vs finetune - model/architecture name - datasets - channels - pretrain method (e.g. reconstruction)
 
-run_name: "ablation-modelsize-${model_size}-ume-alldata-seg${segment_length}-${channels}-lr${pretrain.engine.base_learning_rate}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
+run_name: "ablation-modelsize-${model_size}-ume-alldata-seg${segment_length}-${channels}-lr${pretrain.engine.optimizer_kwargs.lr}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
 
 # GLOBAL PARAMS
 seed: 42
@@ -66,24 +66,25 @@ pretrain:
     base_path: "./data_online.nosync" 
     sample_scaling_method: null
     shift: 1
+    subsample: 0.2
     dataset_names:
-    - BiHeartS
-    - big-ideas-glycemic-wearable
-    - Dynamics
-    - EmpaticaE4Stress
-    - EPM
-    - LAUREATE
-    - MEFAR
-    - M2Sleep
-    - PPG_FieldStudy
-    - SEED
-    - SEED-II-Lab
-    - SEED-II-Wild
-    - Stress Predict Dataset
-    - ToadStool
+    # - BiHeartS
+    # - big-ideas-glycemic-wearable
+    # - Dynamics
+    # - EmpaticaE4Stress
+    # - EPM
+    # - LAUREATE
+    # - MEFAR
+    # - M2Sleep
+    # - PPG_FieldStudy
+    # - SEED
+    # - SEED-II-Lab
+    # - SEED-II-Wild
+    # - Stress Predict Dataset
+    # - ToadStool
     - WEEE
-    - WESD
-    - Workplaces
+    # - WESD
+    # - Workplaces
   model:
     in_channels: 3
     stem_channels: ${model_size_presets.${model_size}.stem_channels}
@@ -96,7 +97,7 @@ pretrain:
     loss_fn:
       ignore_keys: true
   trainer:
-    fast_dev_run: false
+    fast_dev_run: true
 
 # DOWNSTREAM PARAMS
 downstream:
@@ -110,7 +111,7 @@ downstream:
   datamodule:
     path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
     recompute_features: true
-    debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+    debug: true # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
 
 
 # SWEEP

@@ -94,25 +94,60 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
             if self.data_augmentation is not None and self.training:
                 if self.scaling_params is not None:
                     batch["x"] = self.apply_scaling(batch["x"])
-                # Convert to numpy for augmentation
                 x = batch["x"]
-                x_np = x.cpu().numpy()
-                device = x.device
 
-                # Vectorized augmentation function
-                augment_fn = np.vectorize(self.data_augmentation,signature="(t)->(t)")
-                if x_np.ndim == 3:
-                    x_np = x_np.transpose(0,2,1)  # (batch, channels, time)
-                # Apply augmentation in a vectorized way
-                batch_aug_1_np = augment_fn(x_np)
-                batch_aug_2_np = augment_fn(x_np)
-                if x_np.ndim == 3:
-                    batch_aug_1_np = batch_aug_1_np.transpose(0,2,1)  # Back to (batch, time, channels)
-                    batch_aug_2_np = batch_aug_2_np.transpose(0,2,1)
+                def _augment_series_1d(series: torch.Tensor) -> torch.Tensor:
+                    """Apply one augmentation to a single 1D time series."""
+                    try:
+                        augmented = self.data_augmentation(series)
+                    except (TypeError, ValueError, RuntimeError):
+                        # Compatibility fallback for legacy numpy-based augmenters.
+                        augmented = self.data_augmentation(series.detach().cpu().numpy())
 
-                # Convert back to tensor
-                batch_aug_1 = torch.from_numpy(batch_aug_1_np).float().to(device)
-                batch_aug_2 = torch.from_numpy(batch_aug_2_np).float().to(device)
+                    if torch.is_tensor(augmented):
+                        augmented_t = augmented.to(device=series.device, dtype=series.dtype)
+                    elif isinstance(augmented, np.ndarray):
+                        augmented_t = torch.from_numpy(augmented).to(device=series.device, dtype=series.dtype)
+                    else:
+                        raise TypeError(
+                            "Data augmentation must return a torch.Tensor or numpy.ndarray, "
+                            f"got {type(augmented)}"
+                        )
+
+                    if augmented_t.ndim != 1 or augmented_t.shape[0] != series.shape[0]:
+                        raise ValueError(
+                            "Data augmentation must preserve 1D time-series shape. "
+                            f"Expected ({series.shape[0]},), got {tuple(augmented_t.shape)}"
+                        )
+
+                    return augmented_t
+
+                def _augment_batch_tensor(input_x: torch.Tensor) -> torch.Tensor:
+                    """
+                    Apply augmentation independently to each 1D time series.
+                    Supports input shapes (B, T) and (B, T, C).
+                    """
+                    if input_x.ndim == 2:
+                        # (batch, time)
+                        flat = input_x
+                        augmented_flat = [_augment_series_1d(series) for series in flat]
+                        return torch.stack(augmented_flat, dim=0)
+
+                    if input_x.ndim == 3:
+                        # (batch, time, channels) -> apply per (time,) channel-series
+                        bsz, t_steps, n_channels = input_x.shape
+                        flat = input_x.permute(0, 2, 1).reshape(-1, t_steps)
+                        augmented_flat = [_augment_series_1d(series) for series in flat]
+                        stacked = torch.stack(augmented_flat, dim=0)
+                        return stacked.reshape(bsz, n_channels, t_steps).permute(0, 2, 1).contiguous()
+
+                    raise ValueError(
+                        f"Unsupported input shape for data augmentation: {tuple(input_x.shape)}. "
+                        "Expected (B, T) or (B, T, C)."
+                    )
+
+                batch_aug_1 = _augment_batch_tensor(x)
+                batch_aug_2 = _augment_batch_tensor(x)
 
                 batch["x_1"] = batch_aug_1
                 batch["x_2"] = batch_aug_2

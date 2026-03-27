@@ -27,7 +27,7 @@ trainer:
   logger: ${pretrain.logger}
   check_val_every_n_epoch: 1
   callbacks: ${pretrain.callbacks}
-  limit_train_batches: 3000
+  limit_train_batches: 5000
 
 # Override dataloader settings
 dataloader:
@@ -39,6 +39,7 @@ dataloader:
 
 # Override engine settings (data augmentation and optimizer)
 engine:
+  base_learning_rate: 0.0005
   data_augmentation:
     _target_: torchvision.transforms.RandomChoice
     transforms:
@@ -129,7 +130,7 @@ engine:
       #   knot_max: 4
       #   data_freq: 4
   optimizer_kwargs:
-    lr: 0.0005
+    lr: ${pretrain.engine.base_learning_rate}
     weight_decay: 0.001
     
 dataset_scaling_fun:

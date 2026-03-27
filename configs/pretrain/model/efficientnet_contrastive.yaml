@@ -7,6 +7,7 @@ in_channels: 1
 seq_len: ${pretrain.dataset.segment_length}
 
 # Architecture parameters
+# Default values correspond to the "base" variant in the conf-ume-ablation-size sweep.
 stem_channels: 64
 mbconv_channels: 64
 num_mbconv_blocks: 16  # M parameter - number of MBConv1D blocks. Apple used 16!

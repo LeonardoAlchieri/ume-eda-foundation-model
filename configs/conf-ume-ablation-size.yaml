@@ -1,0 +1,125 @@
+defaults:
+  - pretrain: contrastive
+  - downstream: default
+  - _self_
+  - override /hydra/sweeper: list
+
+project_name: EDAMAME-pretrain-postsubmission
+group_name: "ablation-modelsize-ume-alldata-${channels}-contrastive"
+# group naming convention: pretrain vs finetune - model/architecture name - datasets - channels - pretrain method (e.g. reconstruction)
+
+run_name: "ablation-modelsize-${model_size}-ume-alldata-seg${segment_length}-${channels}-lr${pretrain.engine.base_learning_rate}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
+
+# GLOBAL PARAMS
+seed: 42
+segment_length: 240
+channels: [0,1,2]
+sampling_rate: 4
+accelerator: "cuda"
+device_num: [0]
+
+# EfficientNet model-size preset selected by the Hydra sweep.
+model_size: base
+
+# Presets aligned with pretrain/model/efficientnet_contrastive.yaml where "base" is:
+# stem=64, mbconv=64, blocks=16, head=248, emb=64, kernel=9, dropout=0.5
+model_size_presets:
+  tiny:
+    stem_channels: 32
+    mbconv_channels: 32
+    num_mbconv_blocks: 4
+    head_channels: 96
+    embedding_dim: 32
+    kernel_size: 5
+    dropout: 0.3
+  small:
+    stem_channels: 48
+    mbconv_channels: 48
+    num_mbconv_blocks: 8
+    head_channels: 160
+    embedding_dim: 48
+    kernel_size: 7
+    dropout: 0.4
+  base:
+    stem_channels: 64
+    mbconv_channels: 64
+    num_mbconv_blocks: 16
+    head_channels: 248
+    embedding_dim: 64
+    kernel_size: 9
+    dropout: 0.5
+  large:
+    stem_channels: 96
+    mbconv_channels: 96
+    num_mbconv_blocks: 24
+    head_channels: 384
+    embedding_dim: 96
+    kernel_size: 11
+    dropout: 0.5
+
+
+# TODO: implement shift in downstream tasks as well
+
+# PRETRAIN PARAMS
+pretrain:
+  dataset:
+    base_path: "./data_online.nosync" 
+    sample_scaling_method: null
+    shift: 1
+    dataset_names:
+    - BiHeartS
+    - big-ideas-glycemic-wearable
+    - Dynamics
+    - EmpaticaE4Stress
+    - EPM
+    - LAUREATE
+    - MEFAR
+    - M2Sleep
+    - PPG_FieldStudy
+    - SEED
+    - SEED-II-Lab
+    - SEED-II-Wild
+    - Stress Predict Dataset
+    - ToadStool
+    - WEEE
+    - WESD
+    - Workplaces
+  model:
+    in_channels: 3
+    stem_channels: ${model_size_presets.${model_size}.stem_channels}
+    mbconv_channels: ${model_size_presets.${model_size}.mbconv_channels}
+    num_mbconv_blocks: ${model_size_presets.${model_size}.num_mbconv_blocks}
+    head_channels: ${model_size_presets.${model_size}.head_channels}
+    embedding_dim: ${model_size_presets.${model_size}.embedding_dim}
+    kernel_size: ${model_size_presets.${model_size}.kernel_size}
+    dropout: ${model_size_presets.${model_size}.dropout}
+    loss_fn:
+      ignore_keys: true
+  trainer:
+    fast_dev_run: false
+
+# DOWNSTREAM PARAMS
+downstream:
+  datasets: 
+    - name: BiHeartS
+      label_name: sleep_wake
+      side: left
+    - name: USILaughs
+      label_name: cognitiveload
+      side: right
+  datamodule:
+    path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
+    recompute_features: true
+    debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+
+
+# SWEEP
+hydra:
+  mode: MULTIRUN
+  sweep:
+    dir: "outputs.nosync/${run_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
+    # subdir: "${pretrain.model.loss_fn.masked_weight}-${seed}"
+  sweeper:
+    list_params:
+      # Explicit size presets (one run per preset, no Cartesian combinations).
+      model_size: tiny, small, base, large

@@ -94,73 +94,25 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
             if self.data_augmentation is not None and self.training:
                 if self.scaling_params is not None:
                     batch["x"] = self.apply_scaling(batch["x"])
+                # Convert to numpy for augmentation
                 x = batch["x"]
+                x_np = x.cpu().numpy()
+                device = x.device
 
-                def _to_tensor_like_input(augmented_output, input_x: torch.Tensor) -> torch.Tensor:
-                    if torch.is_tensor(augmented_output):
-                        augmented_t = augmented_output.to(device=input_x.device, dtype=input_x.dtype)
-                    elif isinstance(augmented_output, np.ndarray):
-                        augmented_t = torch.from_numpy(augmented_output).to(
-                            device=input_x.device,
-                            dtype=input_x.dtype,
-                        )
-                    else:
-                        raise TypeError(
-                            "Data augmentation must return a torch.Tensor or numpy.ndarray, "
-                            f"got {type(augmented_output)}"
-                        )
+                # Vectorized augmentation function
+                augment_fn = np.vectorize(self.data_augmentation,signature="(t)->(t)")
+                if x_np.ndim == 3:
+                    x_np = x_np.transpose(0,2,1)  # (batch, channels, time)
+                # Apply augmentation in a vectorized way
+                batch_aug_1_np = augment_fn(x_np)
+                batch_aug_2_np = augment_fn(x_np)
+                if x_np.ndim == 3:
+                    batch_aug_1_np = batch_aug_1_np.transpose(0,2,1)  # Back to (batch, time, channels)
+                    batch_aug_2_np = batch_aug_2_np.transpose(0,2,1)
 
-                    if augmented_t.shape != input_x.shape:
-                        raise ValueError(
-                            "Data augmentation must preserve input shape. "
-                            f"Expected {tuple(input_x.shape)}, got {tuple(augmented_t.shape)}"
-                        )
-
-                    return augmented_t
-
-                def _apply_batch_augmentation(input_x: torch.Tensor) -> torch.Tensor:
-                    errors = []
-
-                    # 1) Native torch/batched API
-                    try:
-                        augmented = self.data_augmentation(input_x)
-                        return _to_tensor_like_input(augmented, input_x)
-                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
-                        errors.append(f"torch-call failed: {err}")
-
-                    # 2) Batch-dict API (used by some wrappers)
-                    try:
-                        augmented = self.data_augmentation({"x": input_x})
-                        if isinstance(augmented, dict) and "x" in augmented:
-                            return _to_tensor_like_input(augmented["x"], input_x)
-                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
-                        errors.append(f"dict-torch-call failed: {err}")
-
-                    input_np = input_x.detach().cpu().numpy()
-
-                    # 3) Legacy numpy API on full batch
-                    try:
-                        augmented = self.data_augmentation(input_np)
-                        return _to_tensor_like_input(augmented, input_x)
-                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
-                        errors.append(f"numpy-call failed: {err}")
-
-                    # 4) Legacy dict-numpy API
-                    try:
-                        augmented = self.data_augmentation({"x": input_np})
-                        if isinstance(augmented, dict) and "x" in augmented:
-                            return _to_tensor_like_input(augmented["x"], input_x)
-                        return _to_tensor_like_input(augmented, input_x)
-                    except (TypeError, ValueError, RuntimeError, KeyError, AttributeError) as err:
-                        errors.append(f"dict-numpy-call failed: {err}")
-
-                    raise RuntimeError(
-                        "Could not apply data augmentation on the full batch. "
-                        + " | ".join(errors)
-                    )
-
-                batch_aug_1 = _apply_batch_augmentation(x)
-                batch_aug_2 = _apply_batch_augmentation(x)
+                # Convert back to tensor
+                batch_aug_1 = torch.from_numpy(batch_aug_1_np).float().to(device)
+                batch_aug_2 = torch.from_numpy(batch_aug_2_np).float().to(device)
 
                 batch["x_1"] = batch_aug_1
                 batch["x_2"] = batch_aug_2

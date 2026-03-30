@@ -1,5 +1,6 @@
 from logging import getLogger
 import json
+import os
 from pathlib import Path
 from functools import partial
 
@@ -13,6 +14,7 @@ from torch.utils.data import DataLoader
 from edamame.engine import BaseSelfSupervisedEngine
 from edamame_downstream.feature_extraction.edamame import EdamameExtractor
 from edamame.utils.logging import log_hydra_config_to_lightning
+from edamame.utils.weights import _resolve_resume_checkpoint_path
 
 logger = getLogger(__name__)
 
@@ -49,6 +51,7 @@ def pre_train(cfg: DictConfig) -> tuple[BaseSelfSupervisedEngine, Logger]:
         scaling_params=instantiate(cfg.dataset_scaling_fun)(dataset=train_set),
     )
 
+    resume_ckpt_path = _resolve_resume_checkpoint_path(cfg)
     trainer = instantiate(cfg.trainer)
 
     #############################
@@ -60,7 +63,7 @@ def pre_train(cfg: DictConfig) -> tuple[BaseSelfSupervisedEngine, Logger]:
     ####### MODELS TRAIN ########
     #############################
     try:
-        trainer.fit(engine, train_loader, val_loader)
+        trainer.fit(engine, train_loader, val_loader, ckpt_path=resume_ckpt_path)
     except KeyboardInterrupt:
         logger.info("Training interrupted by user.")
     except Exception as e:
@@ -80,7 +83,7 @@ def pre_train(cfg: DictConfig) -> tuple[BaseSelfSupervisedEngine, Logger]:
                 break
 
     if best_model_path and Path(best_model_path).is_file():
-        checkpoint = torch.load(best_model_path, map_location="cpu")
+        checkpoint = torch.load(best_model_path, map_location="cpu", weights_only=False)
         state_dict = checkpoint.get("state_dict", checkpoint)
         missing_keys, unexpected_keys = engine.load_state_dict(state_dict, strict=False)
         if missing_keys or unexpected_keys:

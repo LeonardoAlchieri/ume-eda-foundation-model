@@ -43,86 +43,86 @@ engine:
     _target_: torchvision.transforms.RandomChoice
     transforms:
       # Gaussian Noise
-      - _target_: edamame.data_augmentation.matton_augment_torch.GaussianNoiseStochastic
+      - _target_: edamame.data_augmentation.matton_augment.GaussianNoiseStochastic
         sigma_scale_min: 0.0
         sigma_scale_max: 0.5
       # Identity (no augmentation)
-      - _target_: edamame.data_augmentation.matton_augment_torch.Identity
+      - _target_: edamame.data_augmentation.matton_augment.Identity
       # Low Pass Filter
-      - _target_: edamame.data_augmentation.matton_augment_torch.LowPassFilterStochastic
+      - _target_: edamame.data_augmentation.matton_augment.LowPassFilterStochastic
         data_freq: 4
         highcut_hz_min: 0.01
         highcut_hz_max: 1
         n_steps: 1000
       # High Pass Filter
-      - _target_: edamame.data_augmentation.matton_augment_torch.HighPassFilterStochastic
+      - _target_: edamame.data_augmentation.matton_augment.HighPassFilterStochastic
         data_freq: 4
         lowcut_hz_min: 0.01
         lowcut_hz_max: 1
         n_steps: 1000
       # High Frequency Noise
-      - _target_: edamame.data_augmentation.matton_augment_torch.HighFrequencyNoiseStochastic
+      - _target_: edamame.data_augmentation.matton_augment.HighFrequencyNoiseStochastic
         sigma_scale_min: 0.0
         sigma_scale_max: 1.0
         freq_bin_start_idx: 60
         freq_bin_stop_idx: 120
       # Bandstop Filter
-      - _target_: edamame.data_augmentation.matton_augment_torch.BandstopFilterStochastic
+      - _target_: edamame.data_augmentation.matton_augment.BandstopFilterStochastic
         data_freq: 4
         remove_freq_min: 0.01
         remove_freq_max: 1.0
         Q: 0.707
       # Bandpass Filter
-      - _target_: edamame.data_augmentation.matton_augment_torch.BandpassFilterStochastic
+      - _target_: edamame.data_augmentation.matton_augment.BandpassFilterStochastic
         data_freq: 4
         keep_freq_min: 0.01
         keep_freq_max: 1
         Q: 0.707
       # Temporal Cutout
-      - _target_: edamame.data_augmentation.matton_augment_torch.TemporalCutoutStochastic
+      - _target_: edamame.data_augmentation.matton_augment.TemporalCutoutStochastic
         cutout_size_min: 20
         cutout_size_max: 100
       # Permute
-      - _target_: edamame.data_augmentation.matton_augment_torch.PermuteStochastic
+      - _target_: edamame.data_augmentation.matton_augment.PermuteStochastic
         n_splits_max: 10
       # Flip
-      - _target_: edamame.data_augmentation.matton_augment_torch.Flip
+      - _target_: edamame.data_augmentation.matton_augment.Flip
       # Time Warping
-      - _target_: edamame.data_augmentation.matton_augment_torch.TimeWarpingStochastic
+      - _target_: edamame.data_augmentation.matton_augment.TimeWarpingStochastic
         sigma_min: 0.01
         sigma_max: 0.1
         knot_min: 1
         knot_max: 4
       # Amplitude Warping
-      - _target_: edamame.data_augmentation.matton_augment_torch.AmplitudeWarpingStochastic
+      - _target_: edamame.data_augmentation.matton_augment.AmplitudeWarpingStochastic
         sigma_min: 0.01
         sigma_max: 0.05
         knot_min: 0
         knot_max: 4
       # Loose Sensor Artifact
-      - _target_: edamame.data_augmentation.matton_augment_torch.LooseSensorArtifactStochastic
+      - _target_: edamame.data_augmentation.matton_augment.LooseSensorArtifactStochastic
         width_min: 4
         width_max: 120
         smooth_width_min: 2
         smooth_width_max: 20
       # Jump Artifact
-      - _target_: edamame.data_augmentation.matton_augment_torch.JumpArtifactStochastic
+      - _target_: edamame.data_augmentation.matton_augment.JumpArtifactStochastic
         max_n_jumps: 2
         shift_factor_min: 0.01
         shift_factor_max: 0.2
         smooth_width_min: 2
         smooth_width_max: 12
       # Constant Amplitude Scaling
-      - _target_: edamame.data_augmentation.matton_augment_torch.ConstantAmplitudeScalingStochastic
+      - _target_: edamame.data_augmentation.matton_augment.ConstantAmplitudeScalingStochastic
         scale_min: 0.5
         scale_max: 1.5
       # Tonic Constant Amplitude Scaling
-      # - _target_: edamame.data_augmentation.matton_augment_torch.TonicConstantAmplitudeScalingStochastic
+      # - _target_: edamame.data_augmentation.matton_augment.TonicConstantAmplitudeScalingStochastic
       #   tonic_scale_factor_min: 0.5
       #   tonic_scale_factor_max: 1.5
       #   data_freq: 4
       # # Tonic Amplitude Warping
-      # - _target_: edamame.data_augmentation.matton_augment_torch.TonicAmplitudeWarpingStochastic
+      # - _target_: edamame.data_augmentation.matton_augment.TonicAmplitudeWarpingStochastic
       #   sigma_min: 0.01
       #   sigma_max: 0.25
       #   knot_min: 0

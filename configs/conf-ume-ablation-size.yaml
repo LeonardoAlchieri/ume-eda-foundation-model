@@ -68,23 +68,23 @@ pretrain:
     shift: 1
     subsample: 0.2
     dataset_names:
-    # - BiHeartS
-    # - big-ideas-glycemic-wearable
-    # - Dynamics
-    # - EmpaticaE4Stress
-    # - EPM
-    # - LAUREATE
-    # - MEFAR
-    # - M2Sleep
-    # - PPG_FieldStudy
-    # - SEED
-    # - SEED-II-Lab
-    # - SEED-II-Wild
-    # - Stress Predict Dataset
-    # - ToadStool
+    - BiHeartS
+    - big-ideas-glycemic-wearable
+    - Dynamics
+    - EmpaticaE4Stress
+    - EPM
+    - LAUREATE
+    - MEFAR
+    - M2Sleep
+    - PPG_FieldStudy
+    - SEED
+    - SEED-II-Lab
+    - SEED-II-Wild
+    - Stress Predict Dataset
+    - ToadStool
     - WEEE
-    # - WESD
-    # - Workplaces
+    - WESD
+    - Workplaces
   model:
     in_channels: 3
     stem_channels: ${model_size_presets.${model_size}.stem_channels}

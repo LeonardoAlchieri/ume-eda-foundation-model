@@ -25,6 +25,15 @@ class GaussianNoiseDeterministic:
         noise = np.random.normal(scale=noise_sigma, size=len(x))
         return x + noise
 
+def _as_float_scalar(value, name):
+    arr = np.asarray(value)
+    if arr.ndim == 0:
+        return float(arr.item())
+    if arr.size == 1:
+        return float(arr.reshape(()).item())
+    raise ValueError(f"{name} must be a scalar, got shape={arr.shape} type={type(value)}")
+
+
 
 class GaussianNoiseStochastic:
     def __init__(self, sigma_scale_min=0.0, sigma_scale_max=0.5):
@@ -65,6 +74,7 @@ class LowPassFilterDeterministic:
     def __call__(self, x):
         segment_filtered = scipy.signal.filtfilt(self.b, self.a, x)
         return segment_filtered
+
 
 
 @lru_cache(maxsize=None)
@@ -114,7 +124,9 @@ class HighPassFilterDeterministic:
 
 @lru_cache(maxsize=None)
 def memoize_scipy_highpass_butter_design_ba(order, lowcut_hz, fs):
-    b, a = scipy.signal.butter(order, [lowcut_hz], btype="highpass", output="ba", fs=fs)
+    lowcut_hz = _as_float_scalar(lowcut_hz, "lowcut_hz")
+    fs = _as_float_scalar(fs, "fs")
+    b, a = scipy.signal.butter(order, lowcut_hz, btype="highpass", output="ba", fs=fs)
     return b, a
 
 
@@ -131,7 +143,10 @@ class HighPassFilterStochastic:
         self.n_steps = n_steps
 
     def __call__(self, x):
-        lowcut_hz = np.random.choice(np.linspace(self.lowcut_hz_min, self.lowcut_hz_max, self.n_steps))
+        lowcut_hz = _as_float_scalar(
+            np.random.choice(np.linspace(self.lowcut_hz_min, self.lowcut_hz_max, self.n_steps)),
+            "lowcut_hz",
+        )
         b, a = memoize_scipy_highpass_butter_design_ba(
             order=4, lowcut_hz=lowcut_hz, fs=self.data_freq,
         )

@@ -79,7 +79,9 @@ class LowPassFilterDeterministic:
 
 @lru_cache(maxsize=None)
 def memoize_scipy_lowpass_butter_design_ba(order, highcut_hz, fs):
-    b, a = scipy.signal.butter(order, [highcut_hz], btype="lowpass", output="ba", fs=fs)
+    highcut_hz = _as_float_scalar(highcut_hz, "highcut_hz")
+    fs = _as_float_scalar(fs, "fs")
+    b, a = scipy.signal.butter(order, highcut_hz, btype="lowpass", output="ba", fs=fs)
     return b, a
 
 

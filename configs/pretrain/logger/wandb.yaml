@@ -1,0 +1,15 @@
+# Weights & Biases logger configuration
+
+_target_: pytorch_lightning.loggers.WandbLogger
+project: ${project_name}
+group: ${group_name}
+name: ${run_name}
+save_dir: ./wandb_logs.nosync
+log_model: true  # Enable model checkpoint logging
+reinit: finish_previous  # Force reinitialization for each run
+id: null  # Let WandB generate unique IDs
+resume: "allow"  # Never resume runs in sweep mode
+# group: ${pretrain.da}
+# config: ${pretrain...}
+
+# il group mi identifica che esperimento ho, ovvero i setting univoci, e il name contiene seed e timestamp (del computer)

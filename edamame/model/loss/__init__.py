@@ -7,11 +7,10 @@ This module provides loss functions for different SSL paradigms:
 """
 
 from edamame.model.loss.reconstruction import DefaultMAELoss, StandardizedMAELoss
-from edamame.model.loss.contrastive import NCELoss, NCELossCorrected
+from edamame.model.loss.contrastive import NCELoss
 
 __all__ = [
     "DefaultMAELoss",
     "StandardizedMAELoss",
     "NCELoss",
-    "NCELossCorrected",
 ]

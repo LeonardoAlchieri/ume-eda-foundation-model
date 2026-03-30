@@ -1,0 +1,22 @@
+# Mantis-based contrastive model configuration
+
+_target_: edamame.model.mantis_contrastive.MantisContrastive
+
+model_name: "paris-noah/Mantis-8M"
+architecture: "Mantis8M"
+load_pretrained: true
+pre_training: true
+seq_len: 512
+output_token: "cls_token"
+return_transf_layer: -1
+freeze_backbone: false
+channels_strategy: "concat"
+device: ${accelerator}
+
+loss_fn:
+  _target_: edamame.model.loss.contrastive.NCELoss
+  temperature: 0.1
+  ignore_keys: false
+
+# Extra kwargs forwarded to the Mantis class constructor.
+mantis_kwargs: {}

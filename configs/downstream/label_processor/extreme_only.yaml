@@ -1,0 +1,5 @@
+# FIXME: do not work here
+_target_: edamame_downstream.label_processor.extreme_only.ExtremeOnlyLabelProcessor
+lower_threshold: ${downstream.dataset.lower_threshold}
+upper_threshold: ${downstream.dataset.upper_threshold}
+threshold_type: value

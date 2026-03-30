@@ -127,7 +127,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             **kwargs,
         )
 
-    def log_figure(self, fig, tag: str, step: Optional[int] = None):
+    def log_figure(self, fig, tag: str):
         """
         Log a matplotlib figure using Lightning's logger.
         
@@ -137,15 +137,13 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         Args:
             fig: Matplotlib figure to log
             tag: Tag/name for the figure
-            step: Optional step/epoch number (defaults to self.current_epoch)
         """
-        if step is None:
-            step = self.current_epoch
+    
             
         # Try different logging methods based on logger type
         if self.logger is None:
             # No logger configured, save to file as fallback
-            self._save_figure_to_file(fig, tag, step)
+            self._save_figure_to_file(fig, tag)
             return
             
         if hasattr(self.logger, "experiment"):
@@ -155,7 +153,8 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             if hasattr(experiment, "log"):
                 try:
                     import wandb
-                    experiment.log({tag: wandb.Image(fig)}, step=step)
+                    
+                    experiment.log({tag: [wandb.Image(fig)]})
                     return
                 except (ImportError, AttributeError):
                     pass
@@ -163,7 +162,7 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
             # TensorBoard logger
             if hasattr(experiment, "add_figure"):
                 try:
-                    experiment.add_figure(tag, fig, global_step=step)
+                    experiment.add_figure(tag, fig)
                     return
                 except AttributeError:
                     pass
@@ -171,15 +170,15 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         # Other loggers with log_figure method
         if hasattr(self.logger, "log_figure"):
             try:
-                self.logger.log_figure(tag, fig, step)
+                self.logger.log_figure(tag, fig)
                 return
             except (AttributeError, TypeError):
                 pass
 
         # Fallback: save to file
-        self._save_figure_to_file(fig, tag, step)
+        self._save_figure_to_file(fig, tag)
 
-    def _save_figure_to_file(self, fig, tag: str, step: int):
+    def _save_figure_to_file(self, fig, tag: str, step: int | None = None):
         """
         Fallback method to save figure to file when logger doesn't support figures.
         

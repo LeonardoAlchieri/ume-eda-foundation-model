@@ -7,7 +7,6 @@
 Clone the repository and install in editable mode:
 
 ```bash
-git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
 cd eda-foundation-models
 pip install -e .
 ```
@@ -98,8 +97,7 @@ embeddings = pipeline.embed(data)
 To train models, you'll also need the training scripts and config files:
 
 ```bash
-# Make sure you have the full repository
-git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
+# Clone the repo
 cd eda-foundation-models
 
 # Install with dependencies

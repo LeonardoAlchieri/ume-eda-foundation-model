@@ -47,7 +47,7 @@ class EdamamePipeline:
     def __init__(
         self,
         model: nn.Module,
-        model_name: str,
+        model_name: str | None,
         device: torch.device,
         normalization_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         model_config: Optional[Dict[str, Any]] = None,
@@ -68,7 +68,7 @@ class EdamamePipeline:
         self.model_name = model_name
         self.device = device
         self.model_config = model_config or {}
-        self.normalization_fn = normalization_fn
+        # self.normalization_fn = normalization_fn
 
         # Set model to evaluation mode
         self.model.eval()
@@ -88,15 +88,16 @@ class EdamamePipeline:
         Load a pretrained model from checkpoint.
 
         Args:
-            model_name: Name of the model architecture (e.g., "mae", "efficientnet")
+            model_name: Name of the model architecture (e.g., "mae", "efficientnet", "mantis")
             weights_path: Path to the checkpoint file (.ckpt)
             model_config: Path to model config file or config dict.
                          If None, will try to extract from checkpoint.
             device_map: Device mapping strategy:
-                       - "auto": automatically select device (GPU if available)
+                       - "auto": automatically select device (MPS > CUDA > CPU)
                        - "cpu": use CPU
-                       - "cuda": use GPU
-                       - "cuda:0": use specific GPU
+                       - "cuda": use CUDA GPU
+                       - "cuda:0": use specific CUDA GPU
+                       - "mps": use Apple Silicon GPU
             torch_dtype: Data type for model parameters (e.g., torch.float32, torch.float16)
             normalization_fn: Optional normalization function to apply to inputs.
                             Should accept a torch.Tensor and return a torch.Tensor.
@@ -130,9 +131,11 @@ class EdamamePipeline:
             model = cls._load_mae_model(config_dict, checkpoint, torch_dtype)
         elif model_name.lower() == "efficientnet":
             model = cls._load_efficientnet_model(config_dict, checkpoint, torch_dtype)
+        elif model_name.lower() == "mantis":
+            model = cls._load_mantis_model(config_dict, checkpoint, torch_dtype)
         else:
             raise ValueError(
-                f"Model '{model_name}' not supported. Currently supported: 'mae', 'efficientnet'."
+                f"Model '{model_name}' not supported. Currently supported: 'mae', 'efficientnet', 'mantis'."
             )
 
         # Create pipeline instance
@@ -156,9 +159,23 @@ class EdamamePipeline:
             torch.device object
         """
         if device_map == "auto":
-            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            # Priority: MPS (Apple Silicon) > CUDA > CPU
+            if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+                return torch.device("mps")
+            elif torch.cuda.is_available():
+                return torch.device("cuda")
+            else:
+                return torch.device("cpu")
         elif device_map == "cpu":
             return torch.device("cpu")
+        elif device_map == "mps":
+            if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+                return torch.device("mps")
+            else:
+                raise RuntimeError(
+                    "MPS device requested but not available. "
+                    "Make sure you're running on Apple Silicon with PyTorch >= 1.12"
+                )
         elif device_map.startswith("cuda"):
             return torch.device(device_map)
         else:
@@ -289,6 +306,85 @@ class EdamamePipeline:
         return model
 
     @staticmethod
+    def _load_mantis_model(
+        config_dict: Dict[str, Any],
+        checkpoint: Dict[str, Any],
+        torch_dtype: Optional[torch.dtype] = None,
+    ) -> nn.Module:
+        """
+        Load Mantis contrastive model.
+
+        Args:
+            config_dict: Model configuration
+            checkpoint: Loaded checkpoint
+            torch_dtype: Data type for model
+
+        Returns:
+            Loaded Mantis model
+        """
+        from edamame.model.mantis_contrastive import MantisContrastive
+        import torch.nn as nn
+
+        # Extract state dict - handle different checkpoint formats
+        if "state_dict" in checkpoint:
+            state_dict = checkpoint["state_dict"]
+            # Remove 'model.' prefix if present
+            state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
+        else:
+            state_dict = checkpoint
+
+        # Infer model parameters from state dict if config is empty
+        if not config_dict:
+            config_dict = EdamamePipeline._infer_mantis_config_from_state_dict(state_dict)
+
+        # Ensure loss_fn exists (required by init but not used in eval)
+        if "loss_fn" not in config_dict:
+            config_dict["loss_fn"] = nn.Identity()
+
+        if "pre_training" not in config_dict:
+            config_dict["pre_training"] = False
+
+        if "load_pretrained" not in config_dict:
+            config_dict["load_pretrained"] = False
+
+        # Create model
+        model = MantisContrastive(**config_dict)
+
+        # Load weights
+        model.load_state_dict(state_dict, strict=False)
+
+        # Convert dtype if specified
+        if torch_dtype is not None:
+            model = model.to(dtype=torch_dtype)
+
+        return model
+
+    @staticmethod
+    def _infer_mantis_config_from_state_dict(
+        state_dict: Dict[str, torch.Tensor],
+    ) -> Dict[str, Any]:
+        """
+        Infer Mantis configuration from state dictionary.
+
+        Args:
+            state_dict: Model state dictionary
+
+        Returns:
+            Inferred configuration dictionary
+        """
+        config = {}
+        
+        # Look for architecture specific keys
+        if any("mantis.V2" in k for k in state_dict.keys()):
+            config["architecture"] = "MantisV2"
+        elif any("mantis.V1" in k for k in state_dict.keys()):
+            config["architecture"] = "MantisV1"
+        else:
+            config["architecture"] = "Mantis8M"
+            
+        return config
+
+    @staticmethod
     def _infer_efficientnet_config_from_state_dict(
         state_dict: Dict[str, torch.Tensor],
     ) -> Dict[str, Any]:
@@ -303,10 +399,11 @@ class EdamamePipeline:
         """
         config = {}
 
-        # Infer stem channels
+        # Infer stem channels and kernel size
         if "stem_conv.weight" in state_dict:
             config["in_channels"] = state_dict["stem_conv.weight"].shape[1]
             config["stem_channels"] = state_dict["stem_conv.weight"].shape[0]
+            config["kernel_size"] = state_dict["stem_conv.weight"].shape[2]
 
         # Infer head channels
         if "head_conv.weight" in state_dict:
@@ -326,9 +423,10 @@ class EdamamePipeline:
         if num_mbconv_blocks > 0:
             config["num_mbconv_blocks"] = num_mbconv_blocks
 
-        # Infer mbconv_channels from first MBConv block
-        if "mbconv_blocks.0.expand_conv.weight" in state_dict:
+        # Infer mbconv_channels and kernel size from first MBConv block
+        if "mbconv_blocks.0.project_conv.weight" in state_dict:
             config["mbconv_channels"] = state_dict["mbconv_blocks.0.project_conv.weight"].shape[0]
+        
 
         # Set default values
         config.setdefault("seq_len", 240)
@@ -362,14 +460,34 @@ class EdamamePipeline:
             decoder_embed_dim = state_dict["decoder_pos_embed"].shape[2]
             config["decoder_embed_dim"] = decoder_embed_dim
 
-        # Infer patch size and channels from decoder prediction layer
-        if "decoder_pred.weight" in state_dict:
-            patch_channels_product = state_dict["decoder_pred.weight"].shape[0]
-            # Assume default values if we can't infer
-            config["patch_size"] = 10  # default
-            config["in_channels"] = 1  # default
+        # Infer patch size and in_channels from patch embedding layer
+        # patch_embed.projection.weight has shape (embed_dim, patch_size * in_channels)
+        if "patch_embed.projection.weight" in state_dict:
+            patch_channels_product = state_dict["patch_embed.projection.weight"].shape[1]
+            
+            # Try to infer from decoder_pred as well (has shape: patch_size * in_channels, decoder_embed_dim)
+            if "decoder_pred.weight" in state_dict:
+                decoder_pred_input = state_dict["decoder_pred.weight"].shape[0]
+                # Both should give us patch_size * in_channels
+                patch_channels_product = decoder_pred_input
+            
+            # Common patch sizes to try (in order of preference)
+            for patch_size in [10, 8, 5, 4, 2, 1, 16, 20]:
+                if patch_channels_product % patch_size == 0:
+                    in_channels = patch_channels_product // patch_size
+                    config["patch_size"] = patch_size
+                    config["in_channels"] = in_channels
+                    break
+            else:
+                # Fallback: assume patch_size=10 and calculate in_channels
+                config["patch_size"] = 10
+                config["in_channels"] = max(1, patch_channels_product // 10)
+        else:
+            # Fallback to defaults if we can't infer
+            config["patch_size"] = 10
+            config["in_channels"] = 1
 
-        # Infer sequence length from number of patches (assuming patch_size=10)
+        # Infer sequence length from number of patches
         if "pos_embed" in state_dict and "patch_size" in config:
             num_patches = state_dict["pos_embed"].shape[1]
             config["seq_len"] = num_patches * config["patch_size"]
@@ -413,6 +531,7 @@ class EdamamePipeline:
         inference to get embeddings of the full input.
         
         For EfficientNet models, this returns the embedding from the encoder.
+        For Mantis models, this returns the embedding from the encoder.
 
         Args:
             x: Input tensor of shape (batch_size, seq_len, in_channels)
@@ -424,13 +543,13 @@ class EdamamePipeline:
 
         Returns:
             Embeddings tensor of shape (batch_size, num_visible_patches, embed_dim) for MAE
-            or (batch_size, embedding_dim) for EfficientNet
+            or (batch_size, embedding_dim) for EfficientNet and Mantis
             or tuple of (embeddings, mask, ids_restore) if return_mask=True (MAE only)
 
         Example:
             >>> embeddings = pipeline.embed(batch_data)
             >>> # Get shape: (batch_size, num_patches, embed_dim) for MAE
-            >>> # Get shape: (batch_size, embedding_dim) for EfficientNet
+            >>> # Get shape: (batch_size, embedding_dim) for EfficientNet and Mantis
         """
         # Ensure input is a tensor
         if not isinstance(x, torch.Tensor):
@@ -440,14 +559,14 @@ class EdamamePipeline:
         x = x.to(self.device)
 
         # Apply normalization if provided
-        if self.normalization_fn is not None:
-            x = torch.from_numpy(self.normalization_fn(x.cpu().numpy()))
+        # if self.normalization_fn is not None:
+        #     x = torch.from_numpy(self.normalization_fn(x.cpu().numpy()))
 
         # Ensure model is in eval mode
         self.model.eval()
 
         with torch.no_grad():
-            if self.model_name.lower() == "mae":
+            if self.model_name.lower() == "mae" or self.model_name.lower() == "maskedautoencoder":
                 # Use MAE's encode method
                 embeddings, mask, ids_restore = self.model.encode(
                     x, mask_ratio=mask_ratio
@@ -456,8 +575,8 @@ class EdamamePipeline:
                 if return_mask:
                     return embeddings, mask, ids_restore
                 return embeddings
-            elif self.model_name.lower() == "efficientnet":
-                # Use EfficientNet's get_representation method
+            elif self.model_name.lower() in ["efficientnet", "efficientnetcontrastive", "mantis", "mantiscontrastive"]:
+                # Use get_representation method for contrastive models
                 embeddings = self.model.get_representation(x)
                 return embeddings
             else:
@@ -476,7 +595,7 @@ class EdamamePipeline:
         For MAE models, this performs the full forward pass: encode with masking,
         then decode to reconstruct the original signal.
         
-        Note: This method is only available for MAE models. EfficientNet models
+        Note: This method is only available for MAE models. EfficientNet and Mantis models
         do not support reconstruction.
         
         Important: If a normalization function is provided, the reconstruction
@@ -504,8 +623,8 @@ class EdamamePipeline:
         x = x.to(self.device)
         
         # Apply normalization if provided
-        if self.normalization_fn is not None:
-            x = self.normalization_fn(x)
+        # if self.normalization_fn is not None:
+        #     x = self.normalization_fn(x)
 
         # Ensure model is in eval mode
         self.model.eval()
@@ -539,11 +658,51 @@ class EdamamePipeline:
             Output tensor based on the task
         """
         if task == "embed":
+            
             return self.embed(x, **kwargs)
         elif task == "reconstruct":
             return self.reconstruct(x, **kwargs)
         else:
             raise ValueError(f"Unknown task: {task}. Use 'embed' or 'reconstruct'.")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert pipeline configuration to a dictionary.
+        
+        This method serializes the pipeline's configuration into a dictionary
+        format that can be used for saving, logging, or reconstruction.
+        
+        Note: The model weights are not included in this dictionary. Use
+        torch.save() to save the actual model weights separately.
+        
+        Returns:
+            Dictionary containing:
+                - model_name: Name of the model architecture
+                - model_class: Class name of the model
+                - device: Device type (cpu, cuda, mps)
+                - device_type: String representation of device
+                - model_config: Model configuration parameters
+                - dtype: Data type of model parameters
+        
+        Example:
+            >>> config_dict = pipeline.to_dict()
+            >>> print(config_dict['model_name'])
+            'mae'
+        """
+        # Get model dtype
+        try:
+            model_dtype = next(self.model.parameters()).dtype
+            dtype_str = str(model_dtype).replace('torch.', '')
+        except StopIteration:
+            dtype_str = 'float32'
+        
+        return {
+            'model_name': self.model_name,
+            'model_class': self.model.__class__.__name__,
+            'device': str(self.device),
+            'model_config': self.model_config,
+            'dtype': dtype_str,
+        }
 
     def __repr__(self) -> str:
         """String representation of the pipeline."""

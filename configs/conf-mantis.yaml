@@ -1,0 +1,75 @@
+defaults:
+  - pretrain: mantis
+  - downstream: default
+  - _self_
+  - override /hydra/sweeper: list
+
+project_name: EDAMAME-pretrain-postsubmission
+group_name: "finetune-mantis-alldata-${channels}-contrastive"
+# group naming convention: pretrain vs finetune - model/architecture name - datasets - channels - pretrain method (e.g. reconstruction)
+
+run_name: "finetune-mantis8m-contrastive-alldata-seg${segment_length}-3chan--lr${pretrain.engine.base_learning_rate}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
+
+# GLOBAL PARAMS
+seed: 42
+segment_length: 240
+channels: [0,1,2]
+sampling_rate: 4
+accelerator: "cuda"
+device_num: [0]
+
+
+# TODO: implement shift in downstream tasks as well
+
+# PRETRAIN PARAMS
+pretrain:
+  dataset:
+    base_path: "./data_online.nosync" 
+    sample_scaling_method: null
+    shift: 1
+    dataset_names:
+    - BiHeartS
+    - big-ideas-glycemic-wearable
+    - Dynamics
+    - EmpaticaE4Stress
+    - EPM
+    - LAUREATE
+    - MEFAR
+    - M2Sleep
+    - PPG_FieldStudy
+    - SEED
+    - SEED-II-Lab
+    - SEED-II-Wild
+    - Stress Predict Dataset
+    - ToadStool
+    - WEEE
+    - WESD
+    - Workplaces
+  trainer:
+    fast_dev_run: false
+
+# DOWNSTREAM PARAMS
+downstream:
+  datasets: 
+    - name: BiHeartS
+      label_name: sleep_wake
+      side: left
+    - name: USILaughs
+      label_name: cognitiveload
+      side: right
+  datamodule:
+    path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
+    recompute_features: true
+    debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+
+
+# SWEEP
+# hydra:
+#   mode: MULTIRUN
+#   sweep:
+#     dir: "outputs.nosync/${run_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
+#     # subdir: "${pretrain.model.loss_fn.masked_weight}-${seed}"
+#   sweeper:
+#     list_params:
+#       pretrain.model.mask_ratio: 0.0, 0.1, 0.1
+#       pretrain.model.loss_fn.masked_weight: 0.0, 0.2, 0.7

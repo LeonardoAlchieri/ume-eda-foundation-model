@@ -1,0 +1,41 @@
+# Mantis-aligned contrastive engine configuration
+
+_target_: edamame.engine.MantisContrastiveEngine
+
+model: ${pretrain.model}
+seed: ${seed}
+
+# Keep Mantis defaults
+learning_rate_adjusting: true
+base_learning_rate: ${pretrain.engine.base_learning_rate}
+
+optimizer:
+  _target_: torch.optim.AdamW
+  _partial_: true
+optimizer_kwargs:
+  lr: ${pretrain.engine.base_learning_rate}
+  betas: [0.9, 0.999]
+  weight_decay: 0.05
+
+# Optional external scheduler can still be used via BaseSelfSupervisedEngine.
+scheduler: null
+scheduler_kwargs: {}
+
+metrics: null
+
+# Two explicit augmentation functions (as in original Mantis trainer)
+augmentation_1:
+  _target_: mantis.trainer.trainer_utils.augmentation.RandomCropResize
+  crop_rate_range: [0.0, 0.2]
+  size: 512
+
+augmentation_2:
+  _target_: mantis.trainer.trainer_utils.augmentation.RandomCropResize
+  crop_rate_range: [0.0, 0.2]
+  size: 512
+
+# Also set data_augmentation for backward compatibility with base tooling.
+data_augmentation:
+  _target_: mantis.trainer.trainer_utils.augmentation.RandomCropResize
+  crop_rate_range: [0.0, 0.2]
+  size: 512

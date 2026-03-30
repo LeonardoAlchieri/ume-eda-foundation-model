@@ -25,7 +25,7 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
     the data augmentation pipeline.
     """
 
-    def __init__(self, *args, plot_n_samples: int = 1, **kwargs):
+    def __init__(self, *args, plot_n_samples: int = 3, **kwargs):
         """
         Args:
             plot_n_samples: Number of samples to plot at validation epoch end
@@ -33,21 +33,77 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         """
         super().__init__(*args, **kwargs)
         self.plot_n_samples = plot_n_samples
-        self.validation_batch_for_plotting = None
+        self.validation_batch_for_plotting = []
+        self.samples_batch_idxs = []
+        self.samples_batch_within_batch_idx = []
+        self.samples_idxs = []
 
     def forward(self, batch):
         """Forward pass through the model."""
         x_aug = batch["x_aug"]
         return self.model(x_aug)
 
+    def encode(self, x, mask_ratio=0.0) -> tuple:
+        """
+        Extract encoder embeddings from input data.
+        
+        This method extracts latent representations from the model's encoder
+        without going through the decoder. Useful for downstream tasks or
+        feature extraction.
+        
+        Args:
+            x: Input tensor of shape (batch_size, seq_len, in_channels)
+               Can also be a batch dict with 'x' key
+            mask_ratio: Ratio of patches to mask (default: 0.0 for full encoding).
+                       Set to 0.0 to encode all patches without masking.
+        
+        Returns:
+            Encoder embeddings. The exact shape depends on the model architecture:
+            - For MAE: (batch_size, num_visible_patches, embed_dim) if mask_ratio > 0
+                      or (batch_size, num_patches, embed_dim) if mask_ratio = 0
+            - For other models: model-specific embedding format
+        
+        Example:
+            >>> engine = ReconstructionEngine(model, ...)
+            >>> embeddings = engine.encode(batch_data)
+            >>> # Or with masking
+            >>> embeddings = engine.encode(batch_data, mask_ratio=0.75)
+        """
+        # Handle batch dict format
+        if isinstance(x, dict):
+            x = x["x"]
+        
+        # Ensure model is in eval mode
+        self.model.eval()
+        
+        with torch.no_grad():
+            # Check if model has an encode method
+            if hasattr(self.model, "encode"):
+                # For MAE-like models with explicit encode method
+                if mask_ratio > 0:
+                    # Return embeddings with mask info
+                    embeddings, mask, ids_restore = self.model.encode(x, mask_ratio=mask_ratio)
+                    return embeddings, mask, ids_restore
+                else:
+                    # Return just embeddings when no masking
+                    embeddings, _, _ = self.model.encode(x, mask_ratio=mask_ratio)
+                    return embeddings, None, None
+            elif hasattr(self.model, "get_representation"):
+                # For models with get_representation method (e.g., EfficientNet)
+                return self.model.get_representation(x)
+            else:
+                raise NotImplementedError(
+                    f"Model {self.model.__class__.__name__} does not implement "
+                    "'encode' or 'get_representation' method for embedding extraction."
+                )
+
     def validation_step(self, batch, batch_idx):
         """Validation step with batch storage for plotting."""
         # Store first batch for plotting at epoch end
-        if batch_idx == 0 and self.validation_batch_for_plotting is None:
-            # Store a detached copy of the batch (only original, no augmentation during validation)
-            self.validation_batch_for_plotting = {
-                "x": batch["x"].detach().cpu(),
-            }
+        if batch_idx in self.samples_batch_idxs:
+            within_batch_idx = self.samples_batch_within_batch_idx[self.samples_batch_idxs.index(batch_idx)]
+            self.validation_batch_for_plotting.append(batch['x'][within_batch_idx].detach().cpu())
+            
 
         output = self.forward(batch)
 
@@ -73,16 +129,12 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
         Creates visualization plots of original, masked, and reconstructed signals.
         """
         # Only plot if we have a stored batch
-        if self.validation_batch_for_plotting is None:
+        if len(self.validation_batch_for_plotting) == 0:
             return
 
         # Get the stored batch
-        batch = self.validation_batch_for_plotting
-        x_original = batch["x"]
-
-        # Limit to plot_n_samples
-        n_samples = min(self.plot_n_samples, x_original.shape[0])
-        x_original = x_original[:n_samples]
+        x_original = torch.stack(self.validation_batch_for_plotting, axis=0)
+        epoch = self.current_epoch
 
         # Move to device and get reconstructions
         device = next(self.model.parameters()).device
@@ -110,13 +162,13 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
                 reconstructed = reconstructed.reshape(x_original.shape)
 
         # Create plots
-        self._plot_reconstructions(x_original, reconstructed, mask)
+        self._plot_reconstructions(x_original, reconstructed, epoch, mask)
 
         # Clear the stored batch for next epoch
-        self.validation_batch_for_plotting = None
+        self.validation_batch_for_plotting = []
 
     def _plot_reconstructions(
-        self, x_original, x_reconstructed, mask=None
+        self, x_original, x_reconstructed, epoch, mask=None
     ):
         """
         Create and log overlay plots of original signal with masked regions and reconstruction.
@@ -127,6 +179,7 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
             mask: Optional binary mask, shape (n_samples, num_patches) where 1 = masked, 0 = visible
             masked_input: Optional masked input showing which patches were masked
         """
+        
         n_samples = x_original.shape[0]
 
         # Handle 2D case (N, T) -> (N, T, 1)
@@ -253,8 +306,9 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
 
             plt.tight_layout()
 
+            
             # Log figure using Lightning's logger
-            self.log_figure(fig, f"reconstruction_overlay_sample_{sample_idx}")
+            self.log_figure(fig, f"reconstruction_overlay_sample_{sample_idx}", epoch)
 
             plt.close(fig)
 
@@ -296,3 +350,40 @@ class ReconstructionEngine(BaseSelfSupervisedEngine):
             batch["batch_size"] = batch["x"].shape[0]
 
         return batch
+
+    def on_train_start(self) -> None:
+        """Hook called at the start of training (after dataloaders are set up)."""
+        # Call parent hook if it exists
+        if hasattr(super(), 'on_train_start'):
+            super().on_train_start()
+        
+        # Prepare random indices for plotting samples
+        if self.plot_n_samples > 0:
+            # Access validation dataloader (guaranteed to exist at this point)
+            val_dataloader = self.trainer.val_dataloaders
+            
+            # Handle list of dataloaders
+            if isinstance(val_dataloader, list):
+                val_dataloader = val_dataloader[0]
+            
+            # Get dataset size and batch size
+            val_dataset = val_dataloader.dataset
+            dataset_size = len(val_dataset)
+            batch_size = val_dataloader.batch_size
+            
+            n_samples = min(self.plot_n_samples, dataset_size)
+            self.samples_random_idxs = torch.randperm(dataset_size)[:n_samples]
+            
+            # Calculate which batch each sample belongs to
+            # batch_idx = sample_idx // batch_size
+            # within_batch_idx = sample_idx % batch_size
+            for sample_idx in self.samples_random_idxs:
+                batch_idx = sample_idx.item() // batch_size
+                within_batch_idx = sample_idx.item() % batch_size
+                
+                self.samples_batch_idxs.append(batch_idx)
+                self.samples_batch_within_batch_idx.append(within_batch_idx)
+                self.samples_idxs.append(sample_idx.item())
+        else:
+            self.samples_random_idxs = torch.tensor([], dtype=torch.long)
+            self.samples_batch_mapping = []

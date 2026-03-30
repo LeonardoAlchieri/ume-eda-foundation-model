@@ -1,0 +1,25 @@
+# Default dataset configuration
+
+_target_: edamame.data.dataset_online.EDAtaNoLabelOnlineSegmentation
+base_path: "./data.nosync/online/"
+dataset_names: 
+  - APSync
+  - BiHeartS
+  - CLUES
+  - Dynamics
+  - HeartS
+  - LAUREATE
+  - M2Sleep
+  - SEED-II-Lab
+  - SEED-II-Wild
+  - Workplaces
+shuffle: true
+train_val_test_size: [0.9, 0.1, 0.0]
+seed: 42
+channels: ${channels}  # Channel to use (e.g., 0 for first channel). Use None for all channels. Use a list for multiple channels.
+sample_scaling_method: null
+segment_length: ${segment_length}
+shift: 1
+splitting_method:
+  _target_: edamame.utils.splitting.user_session_splitting
+  _partial_: true

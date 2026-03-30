@@ -155,6 +155,8 @@ class EfficientNetContrastive(nn.Module):
         in_channels=1,
         seq_len=240,
         stem_channels=32,
+        kernel_size: int = 10,
+        stride: int = 2,
         mbconv_channels=64,
         num_mbconv_blocks=4,
         head_channels=128,
@@ -183,7 +185,7 @@ class EfficientNetContrastive(nn.Module):
         
         # Stem: Initial convolution
         self.stem_conv = nn.Conv1d(
-            in_channels, stem_channels, kernel_size=3, stride=2, padding=1, bias=False
+            in_channels, stem_channels, kernel_size=kernel_size, stride=stride, padding=1, bias=False
         )
         self.stem_bn = nn.BatchNorm1d(stem_channels)
         self.stem_activation = Swish()
@@ -195,14 +197,14 @@ class EfficientNetContrastive(nn.Module):
         for i in range(num_mbconv_blocks):
             # First block may change channels, others maintain the same
             out_channels = mbconv_channels if i == 0 else current_channels
-            stride = 2 if i == 0 else 1  # Downsample in first MBConv block
+            current_stride = stride if i == 0 else 1  # Downsample in first MBConv block
             
             self.mbconv_blocks.append(
                 MBConv1D(
                     in_channels=current_channels,
                     out_channels=out_channels,
-                    kernel_size=3,
-                    stride=stride,
+                    kernel_size=kernel_size,
+                    stride=current_stride,
                     expand_ratio=4,
                     se_ratio=0.25,
                     dropout=dropout,

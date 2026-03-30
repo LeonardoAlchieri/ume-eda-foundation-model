@@ -1,0 +1,8 @@
+model: 
+    _target_: sklearn.linear_model.LogisticRegression
+    class_weight: balanced
+param_grid:
+  C: [0.01, 0.1, 1, 10]
+  solver: ["lbfgs", "liblinear"]
+  l1_ratio: [0.0]
+  max_iter: [10000]

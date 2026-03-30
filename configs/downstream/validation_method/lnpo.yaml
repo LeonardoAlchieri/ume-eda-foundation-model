@@ -1,0 +1,3 @@
+_target_: edamame_downstream.validation.LNPO
+num_folds: 5
+random_state: ${seed}

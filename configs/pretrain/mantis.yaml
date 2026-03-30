@@ -1,0 +1,42 @@
+# Mantis pretraining profile (contrastive SSL)
+
+defaults:
+  - model: mantis_contrastive
+  - engine: mantis_contrastive
+  - dataset: eda_default
+  - dataloader: default
+  - logger: wandb
+  - callbacks: default
+  - _self_
+
+save_final_checkpoint: true
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 100
+  accelerator: ${accelerator}
+  devices: ${device_num}
+  log_every_n_steps: 10
+  deterministic: false
+  accumulate_grad_batches: 1
+  precision: "32"
+  logger: ${pretrain.logger}
+  check_val_every_n_epoch: 1
+  callbacks: ${pretrain.callbacks}
+  limit_train_batches: 5000
+
+engine:
+  base_learning_rate: 0.002
+  optimizer_kwargs:
+    lr: ${pretrain.engine.base_learning_rate}
+
+dataloader:
+  batch_size: 128
+  num_workers: 8
+  pin_memory: true
+  drop_last: true
+  persistent_workers: true
+
+dataset_scaling_fun:
+  _target_: edamame.utils.dataset_scaling.get_empty_scaling_params
+  _partial_: true

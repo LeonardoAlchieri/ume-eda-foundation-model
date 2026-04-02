@@ -97,7 +97,8 @@ pretrain:
     loss_fn:
       ignore_keys: true
   trainer:
-    fast_dev_run: true
+    fast_dev_run: false
+    num_sanity_val_steps: -1
 
 # DOWNSTREAM PARAMS
 downstream:
@@ -111,12 +112,12 @@ downstream:
   datamodule:
     path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
     recompute_features: true
-    debug: true # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+    debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
 
 
 # SWEEP
 hydra:
-  mode: MULTIRUN
+  mode: RUN
   sweep:
     dir: "outputs.nosync/${run_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     # subdir: "${pretrain.model.loss_fn.masked_weight}-${seed}"

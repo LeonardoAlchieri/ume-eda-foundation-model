@@ -63,7 +63,7 @@ def pre_train(cfg: DictConfig) -> tuple[BaseSelfSupervisedEngine, Logger]:
     ####### MODELS TRAIN ########
     #############################
     try:
-        trainer.fit(engine, train_loader, val_loader, ckpt_path=resume_ckpt_path)
+        trainer.fit(engine, train_loader, val_loader, ckpt_path=resume_ckpt_path, weights_only=False)
     except KeyboardInterrupt:
         logger.info("Training interrupted by user.")
     except Exception as e:

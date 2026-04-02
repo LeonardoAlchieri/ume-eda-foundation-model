@@ -29,84 +29,20 @@ def _download_checkpoint_from_wandb(
     run_id: str,
     save_dir: str,
     entity: str | None = None,
-) -> Path | None:
+) -> Path:
     try:
         import wandb
     except ImportError:
         logger.warning("wandb is not installed. Cannot download checkpoint from WandB.")
         return None
-
+    
     api = wandb.Api()
-    candidate_entities = [
-        entity,
-        os.getenv("WANDB_ENTITY"),
-        getattr(api, "default_entity", None),
-    ]
-    try:
-        viewer = api.viewer
-        if isinstance(viewer, dict):
-            candidate_entities.append(viewer.get("entity"))
-    except Exception:
-        pass
-
-    candidate_run_paths = [
-        f"{candidate_entity}/{project}/{run_id}"
-        for candidate_entity in candidate_entities
-        if candidate_entity
-    ]
-    candidate_run_paths.append(f"{project}/{run_id}")
-
-    run = None
-    for run_path in dict.fromkeys(candidate_run_paths):
-        try:
-            run = api.run(run_path)
-            logger.info(f"Found WandB run for resume at: {run_path}")
-            break
-        except Exception:
-            continue
-
-    if run is None:
-        logger.warning(
-            "Could not access the requested WandB run. Skipping WandB checkpoint download."
-        )
-        return None
-
+    UserWarning("This API currently works for artifacts saved manually. Will be updated in the future to support automatically saved checkpoints.")
+    artifact = api.artifact(f"{entity}/{project}/model-{run_id}:v0")
+    model_state = artifact.get_entry("last.ckpt")
     resume_dir = Path(save_dir).expanduser() / "resume_checkpoints" / run_id
     resume_dir.mkdir(parents=True, exist_ok=True)
-
-    # First try the canonical run file name.
-    try:
-        run_file = run.file("last.ckpt")
-        if run_file is not None:
-            run_file.download(root=str(resume_dir), replace=True)
-            candidate = resume_dir / "last.ckpt"
-            if candidate.is_file():
-                logger.info(f"Downloaded checkpoint from WandB run files: {candidate}")
-                return candidate
-    except Exception:
-        pass
-
-    # Then try checkpoint artifacts logged by WandB logger.
-    artifacts = []
-    try:
-        artifacts.extend(list(run.logged_artifacts()))
-    except Exception:
-        pass
-
-    for artifact in artifacts:
-        try:
-            artifact_dir = Path(artifact.download(root=str(resume_dir)))
-            checkpoint_candidates = list(artifact_dir.rglob("*.ckpt"))
-            best_candidate = _pick_best_checkpoint(checkpoint_candidates, run_id=run_id)
-            if best_candidate is not None and best_candidate.is_file():
-                logger.info(
-                    f"Downloaded checkpoint from WandB artifact {artifact.name}: {best_candidate}"
-                )
-                return best_candidate
-        except Exception:
-            continue
-
-    return None
+    return model_state.download(root=str(resume_dir))
 
 
 def _find_checkpoint_in_local_lightning_cache(
@@ -142,28 +78,29 @@ def _find_checkpoint_in_local_lightning_cache(
 
 
 def _resolve_resume_checkpoint_path(cfg: DictConfig) -> str | None:
-    logger_cfg = cfg.get("logger")
-    if logger_cfg is None:
-        return None
+    logger_cfg = cfg["logger"]
 
-    logger_target = str(logger_cfg.get("_target_", ""))
+    logger_target = str(logger_cfg["_target_"])
     if "WandbLogger" not in logger_target:
-        return None
+        raise NotImplementedError(
+            f"Unsupported logger type for resume='must' mode: {logger_target}. Only WandbLogger is currently supported."
+        )
 
-    resume_mode = str(logger_cfg.get("resume", "")).lower()
+    resume_mode = str(logger_cfg["resume"]).lower()
     if resume_mode != "must":
         return None
 
-    run_id = str(logger_cfg.get("id", "") or "").strip()
+    run_id = str(logger_cfg["id"] or "").strip()
     if not run_id:
         raise ValueError("WandB resume='must' requires logger.id to be set.")
 
-    project = str(logger_cfg.get("project", "") or "").strip()
+    project = str(logger_cfg["project"] or "").strip()
     if not project:
         raise ValueError("WandB resume='must' requires logger.project to be set.")
 
-    save_dir = str(logger_cfg.get("save_dir", "./wandb_logs.nosync"))
-    entity = logger_cfg.get("entity")
+    save_dir = str(logger_cfg["save_dir"])
+    
+    entity = logger_cfg["entity"]
 
     checkpoint_path = _download_checkpoint_from_wandb(
         project=project,
@@ -174,14 +111,20 @@ def _resolve_resume_checkpoint_path(cfg: DictConfig) -> str | None:
     if checkpoint_path is not None:
         return str(checkpoint_path)
 
-    checkpoint_path = _find_checkpoint_in_local_lightning_cache(
-        run_id=run_id,
-        save_dir=save_dir,
-    )
-    if checkpoint_path is not None:
-        return str(checkpoint_path)
-
     raise FileNotFoundError(
-        "WandB resume='must' is enabled but no checkpoint could be recovered from "
-        "WandB or local Lightning cache."
+        "WandB resume='must' is enabled but checkpoint could not be downloaded from WandB. "
+        "Local Lightning cache lookup is currently disabled for resume='must' mode to avoid "
+        "accidentally picking up the wrong checkpoint. Please ensure that the correct checkpoint "
+        "is available in WandB and try again."
     )
+    # checkpoint_path = _find_checkpoint_in_local_lightning_cache(
+    #     run_id=run_id,
+    #     save_dir=save_dir,
+    # )
+    # if checkpoint_path is not None:
+    #     return str(checkpoint_path)
+
+    # raise FileNotFoundError(
+    #     "WandB resume='must' is enabled but no checkpoint could be recovered from "
+    #     "WandB or local Lightning cache."
+    # )

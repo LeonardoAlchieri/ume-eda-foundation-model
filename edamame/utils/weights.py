@@ -37,9 +37,9 @@ def _download_checkpoint_from_wandb(
         return None
     
     api = wandb.Api()
-    UserWarning("This API currently works for artifacts saved manually. Will be updated in the future to support automatically saved checkpoints.")
-    artifact = api.artifact(f"{entity}/{project}/model-{run_id}:v0")
-    model_state = artifact.get_entry("last.ckpt")
+    
+    artifact = api.artifact(f"{entity}/{project}/model-{run_id}:latest")
+    model_state = artifact.get_entry("model.ckpt")
     resume_dir = Path(save_dir).expanduser() / "resume_checkpoints" / run_id
     resume_dir.mkdir(parents=True, exist_ok=True)
     return model_state.download(root=str(resume_dir))

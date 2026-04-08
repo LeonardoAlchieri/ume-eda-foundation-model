@@ -5189,7 +5189,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/numpy?source=compressed-mapping
+  - pkg:pypi/numpy?source=hash-mapping
   size: 8757569
   timestamp: 1773839284329
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/numpy-2.4.3-py312h84a4f5f_0.conda
@@ -5209,7 +5209,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/numpy?source=compressed-mapping
+  - pkg:pypi/numpy?source=hash-mapping
   size: 6840415
   timestamp: 1773839165988
 - conda: https://conda.anaconda.org/conda-forge/noarch/omegaconf-2.3.0-pyhd8ed1ab_0.conda

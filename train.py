@@ -178,7 +178,6 @@ def downstream(
 
 @hydra.main(
     config_path="./configs",
-    config_name="conf-contrastive-small-kernel",  # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):

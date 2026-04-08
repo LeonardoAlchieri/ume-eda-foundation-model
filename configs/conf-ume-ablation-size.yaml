@@ -15,11 +15,11 @@ seed: 42
 segment_length: 240
 channels: [0,1,2]
 sampling_rate: 4
-accelerator: "cuda"
+accelerator: "mps"
 device_num: [0]
 
 # EfficientNet model-size preset selected by the Hydra sweep.
-model_size: base
+model_size: large
 
 # Presets aligned with pretrain/model/efficientnet_contrastive.yaml where "base" is:
 # stem=64, mbconv=64, blocks=16, head=248, emb=64, kernel=9, dropout=0.5
@@ -63,7 +63,7 @@ model_size_presets:
 # PRETRAIN PARAMS
 pretrain:
   dataset:
-    base_path: "./data_online.nosync" 
+    base_path: "/Users/leonardoalchieri/Desktop/GIT-Mine/datasets_cleaning/data_ready_nolabel.nosync" 
     sample_scaling_method: null
     shift: 1
     subsample: 0.2
@@ -98,7 +98,7 @@ pretrain:
       ignore_keys: true
   trainer:
     fast_dev_run: false
-    num_sanity_val_steps: -1
+    # num_sanity_val_steps: -1
 
 # DOWNSTREAM PARAMS
 downstream:

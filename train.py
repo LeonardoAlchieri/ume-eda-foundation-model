@@ -175,7 +175,6 @@ def downstream(
 
 @hydra.main(
     config_path="./configs",
-    config_name="conf-contrastive-small-kernel",  # TODO: change config name
     version_base="1.3",
 )
 def main(cfg: DictConfig):
@@ -183,13 +182,14 @@ def main(cfg: DictConfig):
     pretrained_model, lightning_logger = pre_train(cfg=cfg.pretrain)
 
     try:
-        downstream(
-            cfg=cfg.downstream,
-            pretraine_model=pretrained_model,
-            segment_length_in_s=cfg.segment_length // cfg.sampling_rate,
-            lightning_logger=lightning_logger,
-            model_name=cfg.pretrain.engine.model._target_.split(".")[-1],
-        )
+        NotImplementedError("Downstream task not implemented yet for multi-modal pretraining.")
+        # downstream(
+        #     cfg=cfg.downstream,
+        #     pretraine_model=pretrained_model,
+        #     segment_length_in_s=cfg.segment_length // cfg.sampling_rate,
+        #     lightning_logger=lightning_logger,
+        #     model_name=cfg.pretrain.engine.model._target_.split(".")[-1],
+        # )
     except Exception as e:
         logger.error(f"Downstream task failed with exception: {e}")
         raise e

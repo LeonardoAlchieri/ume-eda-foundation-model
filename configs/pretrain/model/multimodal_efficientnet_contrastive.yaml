@@ -1,0 +1,31 @@
+# Multimodal EfficientNet contrastive model configuration
+
+_target_: edamame.model.multimodal_efficientnet_contrastive.MultiModalEfficientNetContrastive
+
+modalities:
+  - ACC
+  - BVP
+  - EDA
+  - TEMP
+in_channels_per_modality:
+  ACC: 3
+  BVP: 1
+  EDA: 3
+  TEMP: 1
+
+stem_channels: 64
+mbconv_channels: 64
+num_mbconv_blocks: 8
+head_channels: 248
+embedding_dim: 64
+kernel_size: 9
+stride: 2
+
+fused_embedding_dim: 128
+dropout: 0.2
+normalize_embeddings: true
+
+loss_fn:
+  _target_: edamame.model.loss.contrastive.NCELoss
+  temperature: 0.1
+  ignore_keys: false

@@ -1,6 +1,6 @@
 # Default dataset configuration
 
-_target_: edamame.data.dataset_online.EDAtaNoLabelOnlineSegmentation
+_target_: edamame.data.dataset_online.DataOnline
 base_path: "./data.nosync/online/"
 dataset_names: 
   - APSync

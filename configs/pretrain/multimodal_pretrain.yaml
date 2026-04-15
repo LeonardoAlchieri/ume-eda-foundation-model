@@ -1,0 +1,45 @@
+# Multimodal contrastive pretraining profile
+
+defaults:
+  - model: multimodal_efficientnet_contrastive
+  - engine: contrastive
+  - dataset: multimodal_online
+  - dataloader: default
+  - logger: wandb
+  - callbacks: default
+  - _self_
+
+save_final_checkpoint: true
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 200
+  accelerator: ${accelerator}
+  devices: ${device_num}
+  log_every_n_steps: 10
+  deterministic: false
+  accumulate_grad_batches: 1
+  precision: "32"
+  logger: ${pretrain.logger}
+  check_val_every_n_epoch: 1
+  callbacks: ${pretrain.callbacks}
+  limit_train_batches: 3000
+  fast_dev_run: false
+
+dataloader:
+  batch_size: 64
+  num_workers: 8
+  pin_memory: true
+  drop_last: true
+  persistent_workers: true
+
+engine:
+  optimizer_kwargs:
+    lr: 0.0005
+    weight_decay: 0.001
+  metrics: null
+  data_augmentation: null
+
+dataset_scaling_fun:
+  _target_: edamame.utils.dataset_scaling.get_empty_scaling_params
+  _partial_: true

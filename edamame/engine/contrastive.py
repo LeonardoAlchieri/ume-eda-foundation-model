@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import matplotlib
+from collections.abc import Mapping
 
 matplotlib.use("Agg")  # Non-interactive backend for server environments
 import matplotlib.pyplot as plt
@@ -62,8 +63,10 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         Useful for downstream tasks, inference, or feature extraction.
         
         Args:
-            x: Input tensor of shape (batch_size, seq_len, in_channels)
-               Can also be a batch dict with 'x' key
+                x: Input representation. Supported formats:
+                    - Tensor of shape (batch_size, seq_len[, in_channels])
+                    - Batch dictionary with key 'x'
+                    - Multimodal mapping ``{modality: tensor}``
         
         Returns:
             Embedding tensor of shape (batch_size, embedding_dim)
@@ -72,16 +75,103 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
             >>> engine = ContrastiveEngine(model, ...)
             >>> embeddings = engine.get_representation(batch_data)
         """
-        # Handle batch dict format
-        if isinstance(x, dict):
+        # If a full batch dict is passed, unwrap 'x'.
+        # If a modality mapping is passed directly, keep it as-is.
+        if isinstance(x, Mapping) and "x" in x:
             x = x["x"]
-        
-        # Ensure model is in eval mode
+
+        was_training = self.model.training
         self.model.eval()
-        
-        with torch.no_grad():
-            # Call the model's get_representation method
-            return self.model.get_representation(x)
+        try:
+            with torch.no_grad():
+                return self.model.get_representation(x)
+        finally:
+            if was_training:
+                self.model.train()
+
+    def _infer_batch_size(self, x) -> int:
+        """
+        Infer batch size from tensor or nested multimodal structures.
+        """
+        if torch.is_tensor(x):
+            return int(x.shape[0])
+
+        if isinstance(x, Mapping):
+            if len(x) == 0:
+                raise ValueError("Cannot infer batch size from an empty mapping.")
+            first_value = next(iter(x.values()))
+            return self._infer_batch_size(first_value)
+
+        if isinstance(x, (list, tuple)):
+            if len(x) == 0:
+                raise ValueError("Cannot infer batch size from an empty sequence.")
+            return self._infer_batch_size(x[0])
+
+        raise TypeError(
+            "Unsupported input type for batch-size inference: "
+            f"{type(x)}."
+        )
+
+    def _scale_input(self, x):
+        """
+        Apply scaling recursively to multimodal structures.
+        """
+        if torch.is_tensor(x):
+            return self.apply_scaling(x)
+
+        if isinstance(x, Mapping):
+            return {key: self._scale_input(value) for key, value in x.items()}
+
+        if isinstance(x, list):
+            return [self._scale_input(value) for value in x]
+
+        if isinstance(x, tuple):
+            return tuple(self._scale_input(value) for value in x)
+
+        raise TypeError(
+            "Unsupported input type for scaling: "
+            f"{type(x)}."
+        )
+
+    def _augment_tensor(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Apply augmentation to a tensor batch (2D or 3D).
+        """
+        x_np = x.cpu().numpy()
+        device = x.device
+
+        augment_fn = np.vectorize(self.data_augmentation, signature="(t)->(t)")
+
+        if x_np.ndim == 3:
+            x_np = x_np.transpose(0, 2, 1)  # (batch, channels, time)
+
+        batch_aug_np = augment_fn(x_np)
+
+        if batch_aug_np.ndim == 3:
+            batch_aug_np = batch_aug_np.transpose(0, 2, 1)  # (batch, time, channels)
+
+        return torch.from_numpy(batch_aug_np).float().to(device)
+
+    def _augment_input(self, x):
+        """
+        Apply augmentation recursively to multimodal structures.
+        """
+        if torch.is_tensor(x):
+            return self._augment_tensor(x)
+
+        if isinstance(x, Mapping):
+            return {key: self._augment_input(value) for key, value in x.items()}
+
+        if isinstance(x, list):
+            return [self._augment_input(value) for value in x]
+
+        if isinstance(x, tuple):
+            return tuple(self._augment_input(value) for value in x)
+
+        raise TypeError(
+            "Unsupported input type for augmentation: "
+            f"{type(x)}."
+        )
 
     def on_after_batch_transfer(self, batch, dataloader_idx):
         """
@@ -90,39 +180,23 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         Data augmentation is only applied during training.
         """
         if isinstance(batch, dict) and "x" in batch:
+            x = batch["x"]
+
+            if self.scaling_params is not None:
+                x = self._scale_input(x)
+                batch["x"] = x
+
             # Apply data augmentation to create two views only during training
             if self.data_augmentation is not None and self.training:
-                if self.scaling_params is not None:
-                    batch["x"] = self.apply_scaling(batch["x"])
-                # Convert to numpy for augmentation
-                x = batch["x"]
-                x_np = x.cpu().numpy()
-                device = x.device
-
-                # Vectorized augmentation function
-                augment_fn = np.vectorize(self.data_augmentation,signature="(t)->(t)")
-                if x_np.ndim == 3:
-                    x_np = x_np.transpose(0,2,1)  # (batch, channels, time)
-                # Apply augmentation in a vectorized way
-                batch_aug_1_np = augment_fn(x_np)
-                batch_aug_2_np = augment_fn(x_np)
-                if x_np.ndim == 3:
-                    batch_aug_1_np = batch_aug_1_np.transpose(0,2,1)  # Back to (batch, time, channels)
-                    batch_aug_2_np = batch_aug_2_np.transpose(0,2,1)
-
-                # Convert back to tensor
-                batch_aug_1 = torch.from_numpy(batch_aug_1_np).float().to(device)
-                batch_aug_2 = torch.from_numpy(batch_aug_2_np).float().to(device)
-
-                batch["x_1"] = batch_aug_1
-                batch["x_2"] = batch_aug_2
+                batch["x_1"] = self._augment_input(x)
+                batch["x_2"] = self._augment_input(x)
             else:
                 # If no augmentation or not training, just copy x to x_1 and x_2
-                batch["x_1"] = batch["x"]
-                batch["x_2"] = batch["x"]
+                batch["x_1"] = x
+                batch["x_2"] = x
 
             # Add batch size
-            batch["batch_size"] = batch["x"].shape[0]
+            batch["batch_size"] = self._infer_batch_size(x)
 
         return batch
 

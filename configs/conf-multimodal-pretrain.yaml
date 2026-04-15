@@ -1,0 +1,77 @@
+defaults:
+  - pretrain: multimodal_pretrain
+  - _self_
+
+project_name: EDAMAME-pretrain-multimodal
+group_name: multimodal-efficientnet-contrastive
+run_name: "multimodal-${model_size}-pretrain-seg${segment_length}s-bs${pretrain.dataloader.batch_size}"
+
+# GLOBAL PARAMS
+seed: 42
+segment_length: 60
+sampling_rate: 1
+channels: 0
+accelerator: "mps"
+device_num: [0]
+
+# EfficientNet model-size preset selector for multimodal pretraining.
+# "base" matches configs/pretrain/model/multimodal_efficientnet_contrastive.yaml defaults.
+model_size: tiny
+
+model_size_presets:
+  tiny:
+    stem_channels: 32
+    mbconv_channels: 32
+    num_mbconv_blocks: 4
+    head_channels: 96
+    embedding_dim: 32
+    kernel_size: 5
+    fused_embedding_dim: 64
+    dropout: 0.1
+  small:
+    stem_channels: 48
+    mbconv_channels: 48
+    num_mbconv_blocks: 6
+    head_channels: 160
+    embedding_dim: 48
+    kernel_size: 7
+    fused_embedding_dim: 96
+    dropout: 0.15
+  base:
+    stem_channels: 64
+    mbconv_channels: 64
+    num_mbconv_blocks: 8
+    head_channels: 248
+    embedding_dim: 64
+    kernel_size: 9
+    fused_embedding_dim: 128
+    dropout: 0.2
+  large:
+    stem_channels: 96
+    mbconv_channels: 96
+    num_mbconv_blocks: 12
+    head_channels: 384
+    embedding_dim: 96
+    kernel_size: 11
+    fused_embedding_dim: 192
+    dropout: 0.2
+
+save_final_checkpoint: true
+pretrain:
+  dataset:
+    base_path: "/Volumes/Giovanno/EDAMAME/data_readynolabel_multimodal.nosync"
+  model:
+    stem_channels: ${model_size_presets.${model_size}.stem_channels}
+    mbconv_channels: ${model_size_presets.${model_size}.mbconv_channels}
+    num_mbconv_blocks: ${model_size_presets.${model_size}.num_mbconv_blocks}
+    head_channels: ${model_size_presets.${model_size}.head_channels}
+    embedding_dim: ${model_size_presets.${model_size}.embedding_dim}
+    kernel_size: ${model_size_presets.${model_size}.kernel_size}
+    fused_embedding_dim: ${model_size_presets.${model_size}.fused_embedding_dim}
+    dropout: ${model_size_presets.${model_size}.dropout}
+  trainer:
+    fast_dev_run: 50
+
+# Downstream is intentionally disabled in this run profile.
+downstream:
+  datasets: []

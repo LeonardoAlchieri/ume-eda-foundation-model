@@ -134,6 +134,11 @@ class MBConv1D(nn.Module):
         
         # Skip connection
         if self.use_skip:
+            # Even kernel sizes can create off-by-one temporal mismatches.
+            if out.shape[-1] != identity.shape[-1]:
+                target_len = min(out.shape[-1], identity.shape[-1])
+                out = out[..., :target_len]
+                identity = identity[..., :target_len]
             out = out + identity
             
         return out

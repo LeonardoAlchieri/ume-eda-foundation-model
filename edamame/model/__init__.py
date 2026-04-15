@@ -7,6 +7,10 @@ from edamame.model.mae import MaskedAutoencoder
 from edamame.model.encoder_decoder import EncoderDecoderModel
 from edamame.model.matton_constrastive import ContrastiveModel
 from edamame.model.efficientnet_contrastive import EfficientNetContrastive, MBConv1D
+from edamame.model.multimodal_efficientnet_contrastive import (
+    EfficientNet1DEncoder,
+    MultiModalEfficientNetContrastive,
+)
 from edamame.model.mantis_contrastive import MantisContrastive
 from edamame.model.resnet_contrastive import (
     ResNetContrastive,
@@ -25,6 +29,8 @@ __all__ = [
     'ContrastiveModel',
     'EfficientNetContrastive',
     'MBConv1D',
+    'EfficientNet1DEncoder',
+    'MultiModalEfficientNetContrastive',
     'MantisContrastive',
     'ResNetContrastive',
     'BasicBlock1D',

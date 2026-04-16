@@ -4,7 +4,8 @@ The dataset expects H5 keys with modality suffixes, for example:
 ``/APSYNC/S015/2017-10-05 08:59:41+02:00/ACC``.
 
 Data are grouped by ``(dataset, user, session)`` and stored as one entry where
-``data`` is a modality dictionary, e.g. ``{"acc": ..., "ppg": ...}``.
+``data`` is a modality metadata dictionary, e.g.
+``{"ACC": {"file_path": "...", "key": "/.../ACC"}}``.
 Segmentation is done on-the-fly by index mapping, avoiding materializing all
 windows in memory.
 """
@@ -78,6 +79,7 @@ class DataOnline(Dataset):
         self.sample_scaling_method = sample_scaling_method
         self.splitting_method = splitting_method
         self.train_val_test_size = train_val_test_size
+        self._store_cache: dict[str, pd.HDFStore] = {}
 
         all_data = self._load_data()
         if len(all_data) == 0:
@@ -163,21 +165,15 @@ class DataOnline(Dataset):
                         dataset_from_key, user_from_key, session_from_key, modality = parsed
                         group_id = f"{dataset_from_key}/{user_from_key}/{session_from_key}"
 
-                        data_obj = store.get(key)
-                        if isinstance(data_obj, pd.Series):
-                            data_df = data_obj.to_frame()
-                        else:
-                            data_df = data_obj
-
-                        if "Timestamp" in data_df.columns:
-                            data_df = data_df.drop(columns=["Timestamp"])
-
-                        values = np.asarray(data_df.values)
-                        if values.ndim == 1:
-                            values = values[:, np.newaxis]
-
                         storer = store.get_storer(key)
                         metadata = getattr(storer.attrs, "metadata", {}) or {}
+                        length = getattr(storer, "nrows", None)
+                        if length is None:
+                            shape = getattr(storer, "shape", None)
+                            if isinstance(shape, tuple) and len(shape) > 0:
+                                length = shape[0]
+                        if length is None:
+                            length = int(store.get(key).shape[0])
 
                         record = grouped.setdefault(
                             group_id,
@@ -190,8 +186,11 @@ class DataOnline(Dataset):
                             },
                         )
 
-                        record["data"][modality] = values
-                        record["len_data_per_modality"][modality] = int(values.shape[0])
+                        record["data"][modality] = {
+                            "file_path": str(file_path),
+                            "key": key,
+                        }
+                        record["len_data_per_modality"][modality] = int(length)
 
         all_data = list(grouped.values())
         if len(all_data) == 0:
@@ -240,7 +239,7 @@ class DataOnline(Dataset):
 
             entry["data"] = {m: entry["data"][m] for m in requested_modalities}
             entry["len_data_per_modality"] = {
-                m: int(entry["data"][m].shape[0]) for m in requested_modalities
+                m: int(entry["len_data_per_modality"][m]) for m in requested_modalities
             }
             entry["len_data"] = int(min(entry["len_data_per_modality"].values()))
             standardized.append(entry)
@@ -443,6 +442,63 @@ class DataOnline(Dataset):
             for series_idx in range(len(self.data))
         ]
 
+    @staticmethod
+    def _coerce_hdf_values(data_obj: Union[pd.DataFrame, pd.Series]) -> np.ndarray:
+        data_df = data_obj.to_frame() if isinstance(data_obj, pd.Series) else data_obj
+        if "Timestamp" in data_df.columns:
+            data_df = data_df.drop(columns=["Timestamp"])
+
+        values = np.asarray(data_df.values)
+        if values.ndim == 1:
+            values = values[:, np.newaxis]
+        return values
+
+    def _get_store(self, file_path: str) -> pd.HDFStore:
+        store = self._store_cache.get(file_path)
+        if store is None or not store.is_open:
+            store = pd.HDFStore(file_path, mode="r")
+            self._store_cache[file_path] = store
+        return store
+
+    def _close_store_cache(self) -> None:
+        for _, store in self._store_cache.items():
+            try:
+                store.close()
+            except Exception:
+                logger.debug("Failed to close HDFStore handle cleanly.", exc_info=True)
+        self._store_cache = {}
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["_store_cache"] = {}
+        return state
+
+    def __del__(self):
+        self._close_store_cache()
+
+    def _read_modality_slice(
+        self,
+        entry: dict,
+        modality: str,
+        start: int,
+        stop: int,
+    ) -> np.ndarray:
+        ref = entry["data"][modality]
+        file_path = ref["file_path"]
+        key = ref["key"]
+        store = self._get_store(file_path)
+
+        try:
+            data_obj = store.select(key, start=start, stop=stop)
+            return self._coerce_hdf_values(data_obj)
+        except (TypeError, ValueError, NotImplementedError):
+            values = self._coerce_hdf_values(store.get(key))
+            return values[start:stop]
+
+    def _read_full_modality(self, entry: dict, modality: str) -> np.ndarray:
+        length = int(entry["len_data_per_modality"][modality])
+        return self._read_modality_slice(entry=entry, modality=modality, start=0, stop=length)
+
     def _select_channels(self, values: np.ndarray, modality: str) -> np.ndarray:
         selector = self.channels_by_modality[modality]
         if selector is None:
@@ -484,7 +540,8 @@ class DataOnline(Dataset):
                 user_mins[user_id] = {}
 
             for modality in self.modalities:
-                values = self._select_channels(entry["data"][modality], modality)
+                values = self._read_full_modality(entry, modality)
+                values = self._select_channels(values, modality)
                 values = self._ensure_2d(values)
 
                 min_val = np.min(values, axis=0)
@@ -539,8 +596,12 @@ class DataOnline(Dataset):
         for modality in self.modalities:
             start = window_idx * self.shift_by_modality[modality]
             stop = start + self.segment_length_by_modality[modality]
-            values = entry["data"][modality]
-            segment = values[start:stop]
+            segment = self._read_modality_slice(
+                entry=entry,
+                modality=modality,
+                start=start,
+                stop=stop,
+            )
 
             if segment.shape[0] < self.segment_length_by_modality[modality]:
                 raise IndexError(

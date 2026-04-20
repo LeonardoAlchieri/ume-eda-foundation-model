@@ -3,7 +3,7 @@ defaults:
   - _self_
 
 project_name: EDAMAME-pretrain-multimodal
-group_name: multimodal-efficientnet-contrastive
+group_name: multimodal-sleepfm-baseline
 run_name: "multimodal-${model_size}-pretrain-seg${segment_length}s-bs${pretrain.dataloader.batch_size}"
 
 # GLOBAL PARAMS
@@ -16,7 +16,7 @@ device_num: [0]
 
 # EfficientNet model-size preset selector for multimodal pretraining.
 # "base" matches configs/pretrain/model/multimodal_efficientnet_contrastive.yaml defaults.
-model_size: tiny
+model_size: small
 
 model_size_presets:
   tiny:
@@ -59,7 +59,21 @@ model_size_presets:
 save_final_checkpoint: true
 pretrain:
   dataset:
-    base_path: "/Volumes/Giovanno/EDAMAME/data_readynolabel_multimodal.nosync"
+    base_path: "./data_readynolabel_multimodal.nosync"
+    dataset_names:
+      - "Dynamics"
+      - "EPM"
+      - "LAUREATE"
+      - "MEFAR"
+      - "PPG_FieldStudy"
+      - "SEED"
+      - "SEED-II-Lab"
+      # - "SEED-II-Wild"
+      - "Stress Predict Dataset"
+      - "WEEE"
+      - "WESD"
+      - "Workplaces"
+      - "big-ideas-glycemic-wearable"
   model:
     stem_channels: ${model_size_presets.${model_size}.stem_channels}
     mbconv_channels: ${model_size_presets.${model_size}.mbconv_channels}
@@ -70,7 +84,7 @@ pretrain:
     fused_embedding_dim: ${model_size_presets.${model_size}.fused_embedding_dim}
     dropout: ${model_size_presets.${model_size}.dropout}
   trainer:
-    fast_dev_run: 50
+    fast_dev_run: false
 
 # Downstream is intentionally disabled in this run profile.
 downstream:

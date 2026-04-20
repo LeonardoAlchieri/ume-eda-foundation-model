@@ -137,20 +137,21 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         """
         Apply augmentation to a tensor batch (2D or 3D).
         """
-        x_np = x.cpu().numpy()
-        device = x.device
+        # x_np = x.cpu().numpy()
+        # device = x.device
 
-        augment_fn = np.vectorize(self.data_augmentation, signature="(t)->(t)")
+        # augment_fn = np.vectorize(self.data_augmentation, signature="(t)->(t)")
 
-        if x_np.ndim == 3:
-            x_np = x_np.transpose(0, 2, 1)  # (batch, channels, time)
+        # if x_np.ndim == 3:
+        #     x_np = x_np.transpose(0, 2, 1)  # (batch, channels, time)
 
-        batch_aug_np = augment_fn(x_np)
+        return self.data_augmentation(x.transpose(1, 2)).transpose(1, 2) if x.ndim == 3 else self.data_augmentation(x)
 
-        if batch_aug_np.ndim == 3:
-            batch_aug_np = batch_aug_np.transpose(0, 2, 1)  # (batch, time, channels)
+        # if batch_aug_np.ndim == 3:
+        #     batch_aug_np = batch_aug_np.transpose(0, 2, 1)  # (batch, time, channels)
 
-        return torch.from_numpy(batch_aug_np).float().to(device)
+        # return torch.from_numpy(batch_aug_np).float().to(device)
+        # return batch
 
     def _augment_input(self, x):
         """

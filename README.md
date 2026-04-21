@@ -29,104 +29,82 @@ See also [🫛 EDAMAME](), the large-scale pretrain EDA dataset we have curated 
 
 ## 🎯 Overview
 
-This repository contains the training and inference code for self-supervised EDA foundation models.
+This repo contains the code and weights for **UME**, the first foundation model for wearable EDA data. **UME** is based on EfficientNet architecture and is trained using sample-wise contrastive learning, using the set of data augmentations from [Katie Matton](https://github.com/kmatton/contrastive-learning-for-eda).
 
-The **final and primary model is UME**, an **EfficientNet-inspired 1D contrastive model**:
-
-- Model implementation: [`edamame/model/efficientnet_contrastive.py`](edamame/model/efficientnet_contrastive.py)
-- Default model config: [`configs/pretrain/model/efficientnet_contrastive.yaml`](configs/pretrain/model/efficientnet_contrastive.yaml)
-- Pretraining recipe: [`configs/pretrain/contrastive.yaml`](configs/pretrain/contrastive.yaml)
-
-Key points:
-
-- ✅ UME is the reference model for this repository
-- ✅ Training uses contrastive learning with two augmented views
-- ✅ We release multiple UME configurations (not only the base one)
-- ✅ We release EDAMAME pretrain-size ablation weights for open science
-
----
-
-## 🧭 Model Status
-
-### Primary model (recommended)
-
-- **UME (EfficientNet Contrastive)**
-- Training engine: [`edamame/engine/contrastive.py`](edamame/engine/contrastive.py)
-- Loss: NCE / contrastive objective in [`edamame/model/loss/contrastive.py`](edamame/model/loss/contrastive.py)
-
-### Also present in the codebase
-
-Other architectures remain available for research and legacy experiments (MAE, Mantis, ResNet, etc.), but the repository focus and recommended path are now UME-centered.
+We release the weights for base UME, the default and suggested configuration, as well as other configurations (tiny, small and large). See below for more information on repo usage.
 
 ---
 
 ## 🔧 Installation
 
-### Quick Install
+### Pixi Setup (Recommended)
+
+This repository is configured with Pixi using [`pixi.toml`](pixi.toml)
 
 ```bash
-# Clone and enter repo
+# Install Pixi first (https://pixi.sh), then clone and enter repo
 cd eda-foundation-models
 
-# Install package (editable)
-pip install -e .
-
-# Optional: install all extras
-pip install -e ".[all]"
-```
-
-### Environment File
-
-You can also use the provided environment specification:
-
-- [`env.yaml`](env.yaml)
-- Additional setup notes: [`INSTALL.md`](INSTALL.md)
-
-### Verification
-
-```bash
-python verify_setup.py
+# Resolve and install environment from pixi.toml
+pixi install
 ```
 
 ---
 
-## 🚀 Quick Start (UME)
+## 🚀 Quick Use (UME)
 
-### 1. Data Layout
+We provide a simple API to use the pre-trained model for inference. The weights are provided inside `artifacts`.
 
-Default pretraining dataset loader uses online segmented HDF5 data:
+```python
+import torch
+from edamame import EdamamePipeline
 
-- Loader: [`edamame/data/dataset_online.py`](edamame/data/dataset_online.py)
-- Default dataset config: [`configs/pretrain/dataset/eda_default.yaml`](configs/pretrain/dataset/eda_default.yaml)
+pipeline = EdamamePipeline.from_pretrained(
+    model_name="efficientnet",
+    weights_path="artifacts/ume.ckpt",
+)
 
-### 2. Train UME Baseline
-
-```bash
-python train.py --config-name=conf-contrastive
+# NOTE: default UME requires 60s windows (at 4Hz sampling rate) and 3 channels (mixed, phasic and tonic)
+x = torch.randn(8, 240, 3)  # (batch, seq_len, channels)
+embeddings = pipeline.embed(x)
+print(embeddings.shape)  # (8, embedding_dim)
 ```
 
-Main entrypoint: [`train.py`](train.py)
+---
 
-### 3. Run Other Released UME Config Variants
+## 🏋️ Retrain (UME)
+
+We provide config files with Hydra to reproduce the experiments from our work. Modify the config files to try different configurations.
+
+### 1. Train base UME
 
 ```bash
-# Alternative contrastive config variants
-python train.py --config-name=conf-contrastive-2
-python train.py --config-name=conf-contrastive-small-kernel
-python train.py --config-name=conf-contrastive-large-kernel
+pixi run python train.py --config-name conf-ume
 ```
 
-### 4. Explicitly Select UME Size Preset
+### 2. Train other model and dataset sizes
 
 ```bash
-# Base (recommended)
-python train.py --config-name=conf-ume-ablation-size model_size=base
+# Base (default)
+python train.py --config-name conf-ume model_size=base
 
 # Other released presets
-python train.py --config-name=conf-ume-ablation-size model_size=tiny
-python train.py --config-name=conf-ume-ablation-size model_size=small
-python train.py --config-name=conf-ume-ablation-size model_size=large
+python train.py --config-name conf-ume model_size=tiny
+python train.py --config-name conf-ume model_size=small
+python train.py --config-name conf-ume model_size=large
 ```
+
+```bash
+# Base (default)
+python train.py --config-name conf-ume pretrain.dataset.subsample=1.0
+
+# Other released presets
+python train.py --config-name conf-ume pretrain.dataset.subsample=0.05
+python train.py --config-name conf-ume pretrain.dataset.subsample=0.5
+python train.py --config-name conf-ume pretrain.dataset.subsample=0.75
+```
+
+We also provide templates for sweeps for the model and dataset size (see [sweep-ume-ablation-size.yaml](configs/sweep-ume-ablation-size.yaml) and [sweep-ume-ablation-subsample.yaml](configs/sweep-ume-ablation-subsample.yaml)).
 
 ---
 
@@ -169,7 +147,7 @@ We focus on the **base UME** preset in practice, but we release additional UME c
 
 ### UME model-size presets
 
-Defined in [`configs/conf-ume-ablation-size.yaml`](configs/conf-ume-ablation-size.yaml):
+Defined in [`configs/conf-ume.yaml`](configs/conf-ume.yaml):
 
 | Preset | Stem | MBConv | Blocks | Head | Embedding | Kernel | Dropout |
 |--------|------|--------|--------|------|-----------|--------|---------|
@@ -178,32 +156,7 @@ Defined in [`configs/conf-ume-ablation-size.yaml`](configs/conf-ume-ablation-siz
 | `base` | `64` | `64` | `16` | `248` | `64` | `9`  | `0.5` |
 | `large`| `96` | `96` | `24` | `384` | `96` | `11` | `0.5` |
 
-### Additional released contrastive variants
-
-- [`configs/conf-contrastive.yaml`](configs/conf-contrastive.yaml)
-- [`configs/conf-contrastive-2.yaml`](configs/conf-contrastive-2.yaml)
-- [`configs/conf-contrastive-small-kernel.yaml`](configs/conf-contrastive-small-kernel.yaml)
-- [`configs/conf-contrastive-large-kernel.yaml`](configs/conf-contrastive-large-kernel.yaml)
-
 ---
-
-## 📏 EDAMAME Pretrain-Size Ablations
-
-We also ran UME pretraining with different fractions of the EDAMAME pretraining pool.
-
-Configuration:
-
-- [`configs/conf-ume-ablation-subsample.yaml`](configs/conf-ume-ablation-subsample.yaml)
-
-Subsample values released in that config:
-
-- `0.05`, `0.1`, `0.2`, `0.4`, `0.6`, `0.8`, `1.0`
-
-Example command:
-
-```bash
-python train.py --config-name=conf-ume-ablation-subsample pretrain.dataset.subsample=0.2
-```
 
 > **Open science note**
 > We release ablation checkpoints for transparency and reproducibility. These subsample/ablation weights are **not** our recommended default for downstream use. Prefer the base UME checkpoint unless you are explicitly reproducing ablation analyses.
@@ -215,80 +168,6 @@ python train.py --config-name=conf-ume-ablation-subsample pretrain.dataset.subsa
 Examples of released weights in this repository:
 
 - Main artifact: [`artifacts/ume.ckpt`](artifacts/ume.ckpt)
-- Additional contrastive checkpoint: [`checkpoints.nosync/efficientnet-best.ckpt`](checkpoints.nosync/efficientnet-best.ckpt)
-- Additional runs/checkpoints: [`checkpoints.nosync`](checkpoints.nosync)
-- Extra exported models: [`checkpoints.nosync/final_models`](checkpoints.nosync/final_models)
-
-Some checkpoints correspond to exploratory or ablation runs; use them accordingly.
-
----
-
-## 🚀 Inference API (UME)
-
-Use the packaged pipeline to load UME and extract embeddings:
-
-```python
-import torch
-from edamame import EdamamePipeline
-
-pipeline = EdamamePipeline.from_pretrained(
-    model_name="efficientnet",
-    weights_path="artifacts/ume.ckpt",
-    model_config="configs/pretrain/model/efficientnet_contrastive.yaml",
-    device_map="auto",
-)
-
-x = torch.randn(8, 240, 1)  # (batch, seq_len, channels)
-embeddings = pipeline.embed(x)
-print(embeddings.shape)  # (8, embedding_dim)
-```
-
-Pipeline implementation:
-
-- [`edamame/pipeline/edamame_pipeline.py`](edamame/pipeline/edamame_pipeline.py)
-
----
-
-## 📁 Repository Structure
-
-```text
-eda-foundation-models/
-├── configs/
-│   ├── conf-contrastive.yaml
-│   ├── conf-contrastive-2.yaml
-│   ├── conf-contrastive-small-kernel.yaml
-│   ├── conf-contrastive-large-kernel.yaml
-│   ├── conf-ume-ablation-size.yaml
-│   ├── conf-ume-ablation-subsample.yaml
-│   ├── pretrain/
-│   │   ├── contrastive.yaml
-│   │   ├── engine/contrastive.yaml
-│   │   ├── model/efficientnet_contrastive.yaml
-│   │   └── dataset/eda_default.yaml
-│   └── downstream/
-├── edamame/
-│   ├── data/
-│   ├── data_augmentation/
-│   ├── engine/
-│   ├── model/
-│   │   └── efficientnet_contrastive.py
-│   └── pipeline/
-├── train.py
-├── artifacts/
-└── checkpoints.nosync/
-```
-
----
-
-## ⚙️ Configuration Notes
-
-Config files currently include historical and exploratory variants. A cleanup pass is planned.
-
-For now, if you only need the recommended UME path, start from:
-
-1. [`configs/conf-contrastive.yaml`](configs/conf-contrastive.yaml)
-2. [`configs/pretrain/model/efficientnet_contrastive.yaml`](configs/pretrain/model/efficientnet_contrastive.yaml)
-3. [`configs/pretrain/engine/contrastive.yaml`](configs/pretrain/engine/contrastive.yaml)
 
 ---
 
@@ -315,6 +194,6 @@ This project is licensed under the MIT License. See [`LICENSE`](LICENSE).
 
 ---
 
-<p align="center">
-  <i>Built for open, reproducible EDA foundation modeling.</i>
-</p>
+<!-- <p align="center">
+  <i>People Centered Computing Lab @ USI, Switzerland.</i>
+</p> -->

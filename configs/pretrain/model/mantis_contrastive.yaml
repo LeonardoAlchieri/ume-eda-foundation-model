@@ -16,7 +16,7 @@ device: ${accelerator}
 loss_fn:
   _target_: edamame.model.loss.contrastive.NCELoss
   temperature: 0.1
-  ignore_keys: false
+  ignore_keys: true
 
 # Extra kwargs forwarded to the Mantis class constructor.
 mantis_kwargs: {}

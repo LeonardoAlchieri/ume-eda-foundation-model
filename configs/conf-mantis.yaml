@@ -10,19 +10,20 @@ group_name: "finetune-mantis-alldata-${channels}-contrastive"
 
 run_name: "finetune-mantis8m-contrastive-alldata-seg${segment_length}-3chan--lr${pretrain.engine.base_learning_rate}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
 
+
 # GLOBAL PARAMS
 seed: 42
-segment_length: 240
+segment_length: 240 # 60 seconds at 4Hz
 channels: [0,1,2]
 sampling_rate: 4
-accelerator: "cuda"
+accelerator: "mps"
 device_num: [0]
-
-
-# TODO: implement shift in downstream tasks as well
 
 # PRETRAIN PARAMS
 pretrain:
+  # logger:
+  #   id: null # change to a specific ID and set to "must" to resume a specific run
+  #   resume: "allow"
   dataset:
     base_path: "./data_online.nosync" 
     sample_scaling_method: null
@@ -45,8 +46,11 @@ pretrain:
     - WEEE
     - WESD
     - Workplaces
+  model:
+    loss_fn:
+      ignore_keys: true # set to false to do contrastive learning using data from the same user as positive pairs
   trainer:
-    fast_dev_run: false
+    fast_dev_run: 500
 
 # DOWNSTREAM PARAMS
 downstream:
@@ -61,15 +65,3 @@ downstream:
     path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
     recompute_features: true
     debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
-
-
-# SWEEP
-# hydra:
-#   mode: MULTIRUN
-#   sweep:
-#     dir: "outputs.nosync/${run_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
-#     # subdir: "${pretrain.model.loss_fn.masked_weight}-${seed}"
-#   sweeper:
-#     list_params:
-#       pretrain.model.mask_ratio: 0.0, 0.1, 0.1
-#       pretrain.model.loss_fn.masked_weight: 0.0, 0.2, 0.7

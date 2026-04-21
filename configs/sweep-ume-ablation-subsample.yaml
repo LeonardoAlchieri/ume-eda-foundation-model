@@ -4,26 +4,22 @@ defaults:
   - _self_
   - override /hydra/sweeper: list
 
-project_name: EDAMAME-pretrain-postsubmission
-group_name: "ablation-subsample-ume-alldata-${channels}-contrastive"
-# group naming convention: pretrain vs finetune - model/architecture name - datasets - channels - pretrain method (e.g. reconstruction)
-
-run_name: "ablation-subsample-ms${model_size}-ss${pretrain.dataset.subsample}-ume-alldata-seg${segment_length}-${channels}-lr${pretrain.engine.optimizer_kwargs.lr}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
+project_name: UME
+group_name: "ablation-subsample"
+run_name: "${model_size}-ume-ss${pretrain.dataset.subsample}-seg${segment_length}-${channels}-lr${pretrain.engine.optimizer_kwargs.lr}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
 
 # GLOBAL PARAMS
 seed: 42
 segment_length: 240
 channels: [0,1,2]
 sampling_rate: 4
-accelerator: "cuda"
-device_num: [1]
+accelerator: "auto"
+device_num: [0]
 
-# Default model-size preset. Sweep only subsample by default.
-# You can still change this to tiny/small/large for focused reruns.
+# EfficientNet model-size preset selected by the Hydra sweep.
 model_size: base
 
-# Presets aligned with pretrain/model/efficientnet_contrastive.yaml where "base" is:
-# stem=64, mbconv=64, blocks=16, head=248, emb=64, kernel=9, dropout=0.5
+
 model_size_presets:
   tiny:
     stem_channels: 32
@@ -58,17 +54,17 @@ model_size_presets:
     kernel_size: 11
     dropout: 0.5
 
-
-# TODO: implement shift in downstream tasks as well
-
 # PRETRAIN PARAMS
 pretrain:
+  # logger:
+  #   id: null # change to a specific ID and set to "must" to resume a specific run
+  #   resume: "allow"
   dataset:
-    base_path: "./data_online.nosync"
+    base_path: "data_online.nosync" 
     sample_scaling_method: null
     shift: 1
-    subsample: 0.05
-    dataset_names:
+    subsample: 1.0
+    dataset_names: # datasets, inside the EDAMAME collection, used for pretraining
     - BiHeartS
     - big-ideas-glycemic-wearable
     - Dynamics
@@ -96,14 +92,15 @@ pretrain:
     kernel_size: ${model_size_presets.${model_size}.kernel_size}
     dropout: ${model_size_presets.${model_size}.dropout}
     loss_fn:
-      ignore_keys: true
+      ignore_keys: true # set to false to do contrastive learning using data from the same user as positive pairs
   trainer:
-    fast_dev_run: false
-    # num_sanity_val_steps: -1
+    fast_dev_run: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
 
-# DOWNSTREAM PARAMS
+# DOWNSTREAM PARAMS -> these are used after pretraining the model. 
+# At the end of the pretrain run, we run a couple of downstream tasks to evaluate the quality of the learned representations. 
+# You can change the datasets and label names to run different downstream tasks.
 downstream:
-  datasets:
+  datasets: 
     - name: BiHeartS
       label_name: sleep_wake
       side: left
@@ -115,17 +112,13 @@ downstream:
     recompute_features: true
     debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
 
-
 # SWEEP
 hydra:
-  mode: RUN
+  mode: MULTIRUN
   sweep:
     dir: "outputs.nosync/${run_name}/multirun_${now:%Y-%m-%d}-${now:%H-%M-%S}"
     # subdir: "${pretrain.model.loss_fn.masked_weight}-${seed}"
   sweeper:
     list_params:
-      # One run per subsample value.
-      pretrain.dataset.subsample: 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0
-      # Optional focused reruns with another size (single value, not full grid):
-      # model_size: large
-
+      # Explicit size presets (one run per preset, no Cartesian combinations).
+      pretrain.dataset.subsample: 0.05, 0.2, 0.5, 0.75, 1.0

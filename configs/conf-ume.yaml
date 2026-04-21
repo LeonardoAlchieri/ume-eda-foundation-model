@@ -1,0 +1,114 @@
+defaults:
+  - pretrain: contrastive
+  - downstream: default
+  - _self_
+  - override /hydra/sweeper: list
+
+# RUN PARAMETERS (configured for wandb)
+project_name: UME
+group_name: "main"
+run_name: "${model_size}-ume-ss${pretrain.dataset.subsample}-seg${segment_length}-${channels}-lr${pretrain.engine.optimizer_kwargs.lr}-bs${pretrain.dataloader.batch_size}-losstemp${pretrain.model.loss_fn.temperature}"
+
+# GLOBAL PARAMS
+seed: 42
+segment_length: 240
+channels: [0,1,2]
+sampling_rate: 4
+accelerator: "auto"
+device_num: [0]
+
+# EfficientNet model-size preset selected by the Hydra sweep.
+model_size: base
+
+
+model_size_presets:
+  tiny:
+    stem_channels: 32
+    mbconv_channels: 32
+    num_mbconv_blocks: 4
+    head_channels: 96
+    embedding_dim: 32
+    kernel_size: 5
+    dropout: 0.3
+  small:
+    stem_channels: 48
+    mbconv_channels: 48
+    num_mbconv_blocks: 8
+    head_channels: 160
+    embedding_dim: 48
+    kernel_size: 7
+    dropout: 0.4
+  base:
+    stem_channels: 64
+    mbconv_channels: 64
+    num_mbconv_blocks: 16
+    head_channels: 248
+    embedding_dim: 64
+    kernel_size: 9
+    dropout: 0.5
+  large:
+    stem_channels: 96
+    mbconv_channels: 96
+    num_mbconv_blocks: 24
+    head_channels: 384
+    embedding_dim: 96
+    kernel_size: 11
+    dropout: 0.5
+
+# PRETRAIN PARAMS
+pretrain:
+  # logger:
+  #   id: null # change to a specific ID and set to "must" to resume a specific run
+  #   resume: "allow"
+  dataset:
+    base_path: "data_online.nosync" 
+    sample_scaling_method: null
+    shift: 1
+    subsample: 1.0
+    dataset_names: # datasets, inside the EDAMAME collection, used for pretraining
+    - BiHeartS
+    - big-ideas-glycemic-wearable
+    - Dynamics
+    - EmpaticaE4Stress
+    - EPM
+    - LAUREATE
+    - MEFAR
+    - M2Sleep
+    - PPG_FieldStudy
+    - SEED
+    - SEED-II-Lab
+    - SEED-II-Wild
+    - Stress Predict Dataset
+    - ToadStool
+    - WEEE
+    - WESD
+    - Workplaces
+  model:
+    in_channels: 3
+    stem_channels: ${model_size_presets.${model_size}.stem_channels}
+    mbconv_channels: ${model_size_presets.${model_size}.mbconv_channels}
+    num_mbconv_blocks: ${model_size_presets.${model_size}.num_mbconv_blocks}
+    head_channels: ${model_size_presets.${model_size}.head_channels}
+    embedding_dim: ${model_size_presets.${model_size}.embedding_dim}
+    kernel_size: ${model_size_presets.${model_size}.kernel_size}
+    dropout: ${model_size_presets.${model_size}.dropout}
+    loss_fn:
+      ignore_keys: true # set to false to do contrastive learning using data from the same user as positive pairs
+  trainer:
+    fast_dev_run: 500 # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+
+# DOWNSTREAM PARAMS -> these are used after pretraining the model. 
+# At the end of the pretrain run, we run a couple of downstream tasks to evaluate the quality of the learned representations. 
+# You can change the datasets and label names to run different downstream tasks.
+downstream:
+  datasets: 
+    - name: BiHeartS
+      label_name: sleep_wake
+      side: left
+    - name: USILaughs
+      label_name: cognitiveload
+      side: right
+  datamodule:
+    path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
+    recompute_features: true
+    debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!

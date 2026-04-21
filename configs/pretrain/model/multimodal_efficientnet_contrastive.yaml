@@ -28,4 +28,4 @@ normalize_embeddings: true
 loss_fn:
   _target_: edamame.model.loss.contrastive.NCELoss
   temperature: 0.1
-  ignore_keys: false
+  ignore_keys: true

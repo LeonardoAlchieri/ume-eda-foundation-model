@@ -63,17 +63,17 @@ pretrain:
     dataset_names:
       - "Dynamics"
       - "EPM"
-      - "LAUREATE"
-      - "MEFAR"
-      - "PPG_FieldStudy"
-      - "SEED"
-      - "SEED-II-Lab"
-      # - "SEED-II-Wild"
-      - "Stress Predict Dataset"
-      - "WEEE"
-      - "WESD"
-      - "Workplaces"
-      - "big-ideas-glycemic-wearable"
+      # - "LAUREATE"
+      # - "MEFAR"
+      # - "PPG_FieldStudy"
+      # - "SEED"
+      # - "SEED-II-Lab"
+      # # - "SEED-II-Wild"
+      # - "Stress Predict Dataset"
+      # - "WEEE"
+      # - "WESD"
+      # - "Workplaces"
+      # - "big-ideas-glycemic-wearable"
   model:
     stem_channels: ${model_size_presets.${model_size}.stem_channels}
     mbconv_channels: ${model_size_presets.${model_size}.mbconv_channels}
@@ -84,7 +84,7 @@ pretrain:
     fused_embedding_dim: ${model_size_presets.${model_size}.fused_embedding_dim}
     dropout: ${model_size_presets.${model_size}.dropout}
   trainer:
-    fast_dev_run: false
+    fast_dev_run: 500
 
 # Downstream is intentionally disabled in this run profile.
 downstream:

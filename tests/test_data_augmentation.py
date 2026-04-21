@@ -257,6 +257,32 @@ class TestContrastiveEngineAugmentation:
         torch.testing.assert_close(augmented_batch['x_1'], expected)
         torch.testing.assert_close(augmented_batch['x_2'], expected)
 
+    def test_augmentation_multimodal_mapping_training(self, dummy_model, augmentation):
+        """Test augmentation with multimodal mapping input during training."""
+        engine = ContrastiveEngine(
+            model=dummy_model,
+            data_augmentation=augmentation
+        )
+        engine.train()
+
+        batch_size = 4
+        eda = torch.randn(batch_size, 100)
+        bvp = torch.randn(batch_size, 160)
+        batch = {'x': {'eda': eda, 'bvp': bvp}}
+
+        augmented_batch = engine.on_after_batch_transfer(batch, dataloader_idx=0)
+
+        assert 'x_1' in augmented_batch
+        assert 'x_2' in augmented_batch
+        assert isinstance(augmented_batch['x_1'], dict)
+        assert isinstance(augmented_batch['x_2'], dict)
+
+        torch.testing.assert_close(augmented_batch['x_1']['eda'], eda + 2.0)
+        torch.testing.assert_close(augmented_batch['x_2']['eda'], eda + 2.0)
+        torch.testing.assert_close(augmented_batch['x_1']['bvp'], bvp + 2.0)
+        torch.testing.assert_close(augmented_batch['x_2']['bvp'], bvp + 2.0)
+        assert augmented_batch['batch_size'] == batch_size
+
 
 class TestReconstructionEngineAugmentation:
     """Test data augmentation in ReconstructionEngine."""

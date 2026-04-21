@@ -175,6 +175,7 @@ def downstream(
 
 @hydra.main(
     config_path="./configs",
+    config_name="conf-multimodal-pretrain",
     version_base="1.3",
 )
 def main(cfg: DictConfig):

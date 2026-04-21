@@ -7,7 +7,7 @@ from collections.abc import Sequence
 _T = TypeVar("_T")
 
 from torch.utils.data import Subset, Dataset
-from torch import randperm, default_generator, cat
+from torch import randperm, default_generator, cat, empty, int64
 from pandas import DataFrame
 
 
@@ -35,16 +35,17 @@ def user_session_splitting(
 
     series_indices = randperm(sum(lengths), generator=generator).tolist()  # type: ignore[arg-type, call-overload]
 
-    return [
-        Subset(
-            dataset,
-            cat(
-                [
-                    
-                    dataset.series_to_idx[i]
-                    for i in series_indices[offset - length : offset]
-                ]
-            ),
-        )
-        for offset, length in zip(itertools.accumulate(lengths), lengths)
-    ]
+    subsets: list[Subset[_T]] = []
+    for offset, length in zip(itertools.accumulate(lengths), lengths):
+        selected_series = series_indices[offset - length : offset]
+        selected_indices = [dataset.series_to_idx[i] for i in selected_series]
+
+        # A split can legitimately contain zero series (e.g. test fraction = 0.0).
+        if len(selected_indices) == 0:
+            subset_indices = empty(0, dtype=int64)
+        else:
+            subset_indices = cat(selected_indices)
+
+        subsets.append(Subset(dataset, subset_indices))
+
+    return subsets

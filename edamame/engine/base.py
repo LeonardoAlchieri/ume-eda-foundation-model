@@ -286,8 +286,8 @@ class BaseSelfSupervisedEngine(pl.LightningModule):
         """Training step."""
         loss, output = self.shared_step(batch, step="train")
 
-        if torch.isnan(loss).any():
-            print(f"Warning: NaN loss at epoch {self.current_epoch}, batch {batch_idx}")
+        # if torch.isnan(loss).any():
+        #     print(f"Warning: NaN loss at epoch {self.current_epoch}, batch {batch_idx}")
 
         # Update metrics and log
         if output is not None:

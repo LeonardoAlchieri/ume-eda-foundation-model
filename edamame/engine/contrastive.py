@@ -144,7 +144,6 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
 
         # if x_np.ndim == 3:
         #     x_np = x_np.transpose(0, 2, 1)  # (batch, channels, time)
-
         return self.data_augmentation(x.transpose(1, 2)).transpose(1, 2) if x.ndim == 3 else self.data_augmentation(x)
 
         # if batch_aug_np.ndim == 3:
@@ -241,9 +240,9 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         train_loss = super().training_step(batch, batch_idx)
 
         # Collect embeddings for visualization
-        self._collect_embeddings_for_visualization(
-            batch, self.train_user_counts, self.train_embeddings, self.train_users
-        )
+        # self._collect_embeddings_for_visualization(
+        #     batch, self.train_user_counts, self.train_embeddings, self.train_users
+        # )
 
         return train_loss
 
@@ -256,9 +255,9 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         val_loss = super().validation_step(batch, batch_idx)
 
         # Collect embeddings for visualization
-        self._collect_embeddings_for_visualization(
-            batch, self.val_user_counts, self.validation_embeddings, self.validation_users
-        )
+        # self._collect_embeddings_for_visualization(
+        #     batch, self.val_user_counts, self.validation_embeddings, self.validation_users
+        # )
 
         return val_loss
     

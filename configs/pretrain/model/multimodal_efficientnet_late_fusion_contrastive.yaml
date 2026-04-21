@@ -2,13 +2,16 @@
 
 _target_: edamame.model.multimodal_efficientnet_contrastive.MultiModalEfficientNetContrastive
 
-# Modality setup
 modalities:
-  - modality_0
-  - modality_1
+  - ACC
+  - BVP
+  - EDA
+  - TEMP
 in_channels_per_modality:
-  modality_0: 1
-  modality_1: 1
+  ACC: 3
+  BVP: 1
+  EDA: 3
+  TEMP: 1
 
 # Shared encoder architecture (applied independently per modality)
 stem_channels: 64
@@ -24,10 +27,10 @@ fused_embedding_dim: null  # If null, uses concatenated embeddings directly
 normalize_embeddings: false
 
 # Regularization
-dropout: 0.5
+dropout: 0.2
 
 # Loss function configuration
 loss_fn:
   _target_: edamame.model.loss.contrastive.NCELoss
   temperature: 0.1
-  ignore_keys: false
+  ignore_keys: true

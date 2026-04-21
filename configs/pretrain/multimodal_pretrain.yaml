@@ -1,7 +1,7 @@
 # Multimodal contrastive pretraining profile
 
 defaults:
-  - model: multimodal_efficientnet_contrastive
+  - model: multimodal_efficientnet_late_fusion_contrastive
   - engine: contrastive
   - dataset: multimodal_online
   - dataloader: default
@@ -27,7 +27,7 @@ trainer:
   fast_dev_run: false
 
 dataloader:
-  batch_size: 256
+  batch_size: 64
   num_workers: 8
   pin_memory: true
   drop_last: true
@@ -41,7 +41,7 @@ engine:
   data_augmentation:
     _target_: mantis.trainer.trainer_utils.augmentation.RandomCropResize
     crop_rate_range: [0.0, 0.2]
-    size: 512
+    # size: 512
     # _target_: torchvision.transforms.RandomChoice
     # transforms:
       

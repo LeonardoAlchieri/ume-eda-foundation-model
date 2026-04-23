@@ -461,7 +461,11 @@ class DataOnline(Dataset):
         return store
 
     def _close_store_cache(self) -> None:
-        for _, store in self._store_cache.items():
+        store_cache = getattr(self, "_store_cache", None)
+        if not isinstance(store_cache, dict):
+            return
+
+        for _, store in store_cache.items():
             try:
                 store.close()
             except Exception:
@@ -474,7 +478,12 @@ class DataOnline(Dataset):
         return state
 
     def __del__(self):
-        self._close_store_cache()
+        try:
+            self._close_store_cache()
+        except Exception:
+            # Destructors should never raise during interpreter shutdown or
+            # partial object initialization.
+            logger.debug("Failed to close DataOnline resources in __del__.", exc_info=True)
 
     def _read_modality_slice(
         self,

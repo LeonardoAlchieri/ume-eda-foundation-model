@@ -175,6 +175,7 @@ class DataOnlineInRam(Dataset):
                         values = np.asarray(data_df.values)
                         if values.ndim == 1:
                             values = values[:, np.newaxis]
+                        tensor_values = torch.as_tensor(values, dtype=torch.float32)
 
                         storer = store.get_storer(key)
                         metadata = getattr(storer.attrs, "metadata", {}) or {}
@@ -190,8 +191,8 @@ class DataOnlineInRam(Dataset):
                             },
                         )
 
-                        record["data"][modality] = values
-                        record["len_data_per_modality"][modality] = int(values.shape[0])
+                        record["data"][modality] = tensor_values
+                        record["len_data_per_modality"][modality] = int(tensor_values.shape[0])
 
         all_data = list(grouped.values())
         if len(all_data) == 0:
@@ -443,7 +444,7 @@ class DataOnlineInRam(Dataset):
             for series_idx in range(len(self.data))
         ]
 
-    def _select_channels(self, values: np.ndarray, modality: str) -> np.ndarray:
+    def _select_channels(self, values: torch.Tensor, modality: str) -> torch.Tensor:
         selector = self.channels_by_modality[modality]
         if selector is None:
             return values
@@ -456,12 +457,12 @@ class DataOnlineInRam(Dataset):
                 f"{selector!r} and shape {tuple(values.shape)}."
             ) from exc
 
-        return np.asarray(selected)
+        return selected
 
     @staticmethod
-    def _ensure_2d(values: np.ndarray) -> np.ndarray:
+    def _ensure_2d(values: torch.Tensor) -> torch.Tensor:
         if values.ndim == 1:
-            return values[:, np.newaxis]
+            return values.unsqueeze(-1)
         if values.ndim == 2:
             return values
         raise ValueError(f"Expected 1D/2D array after channel selection, got {values.shape}.")
@@ -474,8 +475,8 @@ class DataOnlineInRam(Dataset):
                 f"Received: {scaling_name}."
             )
 
-        user_maxs: dict[int, dict[str, np.ndarray]] = {}
-        user_mins: dict[int, dict[str, np.ndarray]] = {}
+        user_maxs: dict[int, dict[str, torch.Tensor]] = {}
+        user_mins: dict[int, dict[str, torch.Tensor]] = {}
 
         for entry in self.data:
             user_id = int(entry["user"])
@@ -487,17 +488,17 @@ class DataOnlineInRam(Dataset):
                 values = self._select_channels(entry["data"][modality], modality)
                 values = self._ensure_2d(values)
 
-                min_val = np.min(values, axis=0)
-                max_val = np.max(values, axis=0)
+                min_val = torch.min(values, dim=0).values
+                max_val = torch.max(values, dim=0).values
 
                 if modality not in user_maxs[user_id]:
-                    user_maxs[user_id][modality] = max_val.copy()
-                    user_mins[user_id][modality] = min_val.copy()
+                    user_maxs[user_id][modality] = max_val.clone()
+                    user_mins[user_id][modality] = min_val.clone()
                 else:
-                    user_mins[user_id][modality] = np.minimum(
+                    user_mins[user_id][modality] = torch.minimum(
                         user_mins[user_id][modality], min_val
                     )
-                    user_maxs[user_id][modality] = np.maximum(
+                    user_maxs[user_id][modality] = torch.maximum(
                         user_maxs[user_id][modality], max_val
                     )
 
@@ -554,7 +555,9 @@ class DataOnlineInRam(Dataset):
                 denom = self.user_maxs[sample_user_id][modality] - self.user_mins[sample_user_id][modality] + 1e-8
                 segment = (segment - self.user_mins[sample_user_id][modality]) / denom
 
-            sample[modality] = torch.from_numpy(np.asarray(segment)).float()
+            if segment.dtype != torch.float32:
+                segment = segment.to(dtype=torch.float32)
+            sample[modality] = segment
 
         return {"x": sample, "user": torch.tensor(sample_user_id, dtype=torch.long)}
 

@@ -1,0 +1,46 @@
+# Multimodal online dataset configuration
+
+_target_: edamame.data.dataset_online_allram.DataOnlineInRam
+base_path: "/Volumes/Giovanno/EDAMAME/data_readynolabel_multimodal.nosync"
+dataset_names:
+  - BiHeartS
+  - big-ideas-glycemic-wearable
+  - Dynamics
+  - EmpaticaE4Stress
+  - EPM
+  - LAUREATE
+  - MEFAR
+  - M2Sleep
+  - PPG_FieldStudy
+  - SEED
+  - SEED-II-Lab
+  - SEED-II-Wild
+  - Stress Predict Dataset
+  - ToadStool
+  - WEEE
+  - WESD
+  - Workplaces
+segment_length: ${segment_length}
+sampling_rates_hz:
+  ACC: 32.0
+  BVP: 64.0
+  EDA: 4.0
+  TEMP: 4.0
+shift:
+  ACC: 8
+  BVP: 16
+  EDA: 1
+  TEMP: 1
+shuffle: true
+train_val_test_size: [0.9, 0.1, 0.0]
+seed: ${seed}
+channels: null
+sample_scaling_method: null
+splitting_method:
+  _target_: edamame.utils.splitting.user_session_splitting
+  _partial_: true
+modalities:
+  - ACC
+  - BVP
+  - EDA
+  - TEMP

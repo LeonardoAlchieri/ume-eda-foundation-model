@@ -11,7 +11,7 @@ seed: 42
 segment_length: 60
 sampling_rate: 1
 channels: 0
-accelerator: "mps"
+accelerator: "cuda"
 device_num: [0]
 
 # EfficientNet model-size preset selector for multimodal pretraining.
@@ -58,22 +58,25 @@ model_size_presets:
 
 save_final_checkpoint: true
 pretrain:
+  logger:
+    id: oqrc4jj4  # Let WandB generate unique IDs
+    resume: "must"  # Never resume runs in sweep mode
   dataset:
-    base_path: "./data_readynolabel_multimodal.nosync"
+    base_path: "/home/alchil/Datasets/EDAMAME"
     dataset_names:
       - "Dynamics"
       - "EPM"
-      # - "LAUREATE"
-      # - "MEFAR"
-      # - "PPG_FieldStudy"
-      # - "SEED"
-      # - "SEED-II-Lab"
-      # # - "SEED-II-Wild"
-      # - "Stress Predict Dataset"
-      # - "WEEE"
-      # - "WESD"
-      # - "Workplaces"
-      # - "big-ideas-glycemic-wearable"
+      - "LAUREATE"
+      - "MEFAR"
+      - "PPG_FieldStudy"
+      - "SEED"
+      - "SEED-II-Lab"
+      # - "SEED-II-Wild"
+      - "Stress Predict Dataset"
+      - "WEEE"
+      - "WESD"
+      - "Workplaces"
+      - "big-ideas-glycemic-wearable"
   model:
     stem_channels: ${model_size_presets.${model_size}.stem_channels}
     mbconv_channels: ${model_size_presets.${model_size}.mbconv_channels}
@@ -84,7 +87,7 @@ pretrain:
     fused_embedding_dim: ${model_size_presets.${model_size}.fused_embedding_dim}
     dropout: ${model_size_presets.${model_size}.dropout}
   trainer:
-    fast_dev_run: 500
+    fast_dev_run: false
 
 # Downstream is intentionally disabled in this run profile.
 downstream:

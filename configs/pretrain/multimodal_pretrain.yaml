@@ -27,8 +27,8 @@ trainer:
   fast_dev_run: false
 
 dataloader:
-  batch_size: 64
-  num_workers: 8
+  batch_size: 128
+  num_workers: 5
   pin_memory: true
   drop_last: true
   persistent_workers: true

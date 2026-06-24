@@ -1,0 +1,111 @@
+defaults:
+  - pretrain: tnc
+  - downstream: default
+  - _self_
+  - override /hydra/sweeper: list
+
+# RUN PARAMETERS (configured for wandb)
+project_name: UME
+group_name: "tnc"
+run_name: "${model_size}-tnc-ss${pretrain.dataset.subsample}-seg${segment_length}-${channels}-lr${pretrain.engine.optimizer_kwargs.lr}-bs${pretrain.dataloader.batch_size}-mc${pretrain.dataset.mc_sample_size}-w${pretrain.model.loss_fn.w}"
+
+# GLOBAL PARAMS
+seed: 42
+segment_length: 240
+channels: [0,1,2]
+sampling_rate: 4
+accelerator: "auto"
+device_num: [0]
+
+# EfficientNet model-size preset selected by the Hydra sweep.
+model_size: base
+
+model_size_presets:
+  tiny:
+    stem_channels: 32
+    mbconv_channels: 32
+    num_mbconv_blocks: 4
+    head_channels: 96
+    embedding_dim: 32
+    kernel_size: 5
+    dropout: 0.1
+  small:
+    stem_channels: 48
+    mbconv_channels: 48
+    num_mbconv_blocks: 8
+    head_channels: 160
+    embedding_dim: 48
+    kernel_size: 7
+    dropout: 0.1
+  base:
+    stem_channels: 64
+    mbconv_channels: 64
+    num_mbconv_blocks: 16
+    head_channels: 248
+    embedding_dim: 64
+    kernel_size: 9
+    dropout: 0.1
+  large:
+    stem_channels: 96
+    mbconv_channels: 96
+    num_mbconv_blocks: 24
+    head_channels: 384
+    embedding_dim: 96
+    kernel_size: 11
+    dropout: 0.1
+
+# PRETRAIN PARAMS
+pretrain:
+  dataset:
+    base_path: "data_online.nosync"
+    sample_scaling_method: null
+    shift: 1
+    subsample: 1.0
+    # TNC neighborhood (in samples @ 4 Hz). Tune to the recording lengths.
+    mc_sample_size: 5
+    neighbor_range: 240
+    non_neighbor_gap: 480
+    dataset_names: # datasets, inside the EDAMAME collection, used for pretraining
+    - BiHeartS
+    - big-ideas-glycemic-wearable
+    - Dynamics
+    - EmpaticaE4Stress
+    - EPM
+    - LAUREATE
+    - MEFAR
+    - M2Sleep
+    - PPG_FieldStudy
+    - SEED
+    - SEED-II-Lab
+    - SEED-II-Wild
+    - Stress Predict Dataset
+    - ToadStool
+    - WEEE
+    - WESD
+    - Workplaces
+  model:
+    encoder:
+      in_channels: 3
+      stem_channels: ${model_size_presets.${model_size}.stem_channels}
+      mbconv_channels: ${model_size_presets.${model_size}.mbconv_channels}
+      num_mbconv_blocks: ${model_size_presets.${model_size}.num_mbconv_blocks}
+      head_channels: ${model_size_presets.${model_size}.head_channels}
+      embedding_dim: ${model_size_presets.${model_size}.embedding_dim}
+      kernel_size: ${model_size_presets.${model_size}.kernel_size}
+      dropout: ${model_size_presets.${model_size}.dropout}
+  trainer:
+    fast_dev_run: 500 # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+
+# DOWNSTREAM PARAMS -> run after pretraining to evaluate representation quality.
+downstream:
+  datasets:
+    - name: BiHeartS
+      label_name: sleep_wake
+      side: left
+    - name: USILaughs
+      label_name: cognitiveload
+      side: right
+  datamodule:
+    path_to_data: "../pretrained_foundation_models_physiological_data/data.nosync"
+    recompute_features: true
+    debug: false # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!

@@ -1,0 +1,44 @@
+# Pretrain profile for Temporal Neighborhood Coding (TNC).
+# Augmentation-free contrastive learning on temporal neighborhoods.
+
+defaults:
+  - model: tnc
+  - engine: tnc
+  - dataset: eda_tnc
+  - dataloader: default
+  - logger: wandb
+  - callbacks: default
+  - _self_
+
+# Save configuration
+save_final_checkpoint: true
+
+# Trainer configuration
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 400
+  accelerator: ${accelerator}
+  devices: ${device_num}
+  log_every_n_steps: 10
+  deterministic: false
+  accumulate_grad_batches: 1
+  precision: "32"
+  logger: ${pretrain.logger}
+  check_val_every_n_epoch: 1
+  callbacks: ${pretrain.callbacks}
+  limit_train_batches: 5000
+
+# Override dataloader settings.
+# Each sample expands to (1 + 2*mc_sample_size) encoded windows, so the effective
+# per-step window count is batch_size * (1 + 2*M). Keep batch_size modest.
+dataloader:
+  batch_size: 64
+  num_workers: 8
+  pin_memory: true
+  drop_last: true
+  persistent_workers: true
+
+# No augmentation and no dataset-level scaling (matches the contrastive profile).
+dataset_scaling_fun:
+  _target_: edamame.utils.dataset_scaling.get_empty_scaling_params
+  _partial_: true

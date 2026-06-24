@@ -1,0 +1,27 @@
+# Temporal Neighborhood Coding (TNC) model configuration.
+# Reuses the EfficientNet encoder (no loss_fn on the encoder itself) and adds a
+# neighborhood discriminator via TNCLoss. Augmentation-free contrastive learning.
+
+_target_: edamame.model.tnc.TNCModel
+
+encoder:
+  _target_: edamame.model.efficientnet_contrastive.EfficientNetContrastive
+  in_channels: 1
+  seq_len: ${pretrain.dataset.segment_length}
+  stem_channels: 64
+  mbconv_channels: 64
+  num_mbconv_blocks: 16
+  head_channels: 248
+  embedding_dim: 64
+  kernel_size: 9
+  dropout: 0.5
+  loss_fn: null  # the contrastive objective lives in the TNC loss below
+
+loss_fn:
+  _target_: edamame.model.loss.tnc.TNCLoss
+  embedding_dim: ${pretrain.model.encoder.embedding_dim}
+  w: 0.05                        # PU weight for same-recording non-neighbors
+  hidden_multiplier: 4           # discriminator hidden width = 4 * embedding_dim
+  discriminator_dropout: 0.5
+  cross_recording_negatives: true
+  cross_neg_per_sample: null     # null -> use mc_sample_size negatives per reference

@@ -1,0 +1,32 @@
+# Dataset configuration for Temporal Neighborhood Coding (TNC).
+# Same loading/segmentation/splitting as eda_default, but each sample also carries
+# same-recording temporal neighbors (positives) and non-neighbors (negatives).
+
+_target_: edamame.data.dataset_online.EDAtaTNCOnlineSegmentation
+base_path: "./data.nosync/online/"
+dataset_names:
+  - APSync
+  - BiHeartS
+  - CLUES
+  - Dynamics
+  - HeartS
+  - LAUREATE
+  - M2Sleep
+  - SEED-II-Lab
+  - SEED-II-Wild
+  - Workplaces
+shuffle: true
+train_val_test_size: [0.9, 0.1, 0.0]
+seed: 42
+channels: ${channels}
+sample_scaling_method: null
+segment_length: ${segment_length}
+shift: 1
+splitting_method:
+  _target_: edamame.utils.splitting.user_session_splitting
+  _partial_: true
+
+# --- TNC neighborhood parameters (in samples; sampling_rate = 4 Hz) ---
+mc_sample_size: 5        # M neighbor + M non-neighbor windows per reference
+neighbor_range: 240      # ±η: neighbors within ±1 window-length (±60 s) of the reference
+non_neighbor_gap: 480    # δ: non-neighbors must be > 2 window-lengths (>120 s) away

@@ -351,3 +351,144 @@ class EDAtaNoLabelOnlineSegmentation(Dataset):
             "channels": self.channels,
             "unique_user_ids": self.unique_user_ids,
         }
+
+
+class EDAtaTNCOnlineSegmentation(EDAtaNoLabelOnlineSegmentation):
+    """Online-segmentation dataset for Temporal Neighborhood Coding (TNC).
+
+    TNC (Tonekaboni et al., 2021, https://arxiv.org/abs/2106.00750) is a
+    *non-augmentation* contrastive objective: instead of building two augmented
+    views of a window, it contrasts windows by their **temporal proximity inside
+    the same recording**. For a reference window starting at offset ``t`` we draw
+
+    - **neighbors** (positives): windows whose start offset lies within
+      ``±neighbor_range`` samples of ``t`` (a fixed-distance neighborhood);
+    - **non-neighbors** (negatives): windows from the *same* recording whose
+      start offset is farther than ``non_neighbor_gap`` samples from ``t``.
+
+    Cross-recording (easy) negatives are *not* produced here — they are formed
+    on the fly from other samples in the batch by the TNC loss. This class only
+    supplies the same-recording structure that batching cannot guarantee.
+
+    ``__getitem__`` returns, in addition to the reference window ``x`` and
+    ``user`` of :class:`EDAtaNoLabelOnlineSegmentation`::
+
+        {
+            "x":                FloatTensor (T, C)        # reference window
+            "x_neighbors":      FloatTensor (M, T, C)     # M positives
+            "x_non_neighbors":  FloatTensor (M, T, C)     # M same-recording negatives
+            "non_neighbor_mask":FloatTensor (M,)          # 1 where the negative is valid
+            "user":             LongTensor  ()
+        }
+
+    Recordings too short to supply same-recording non-neighbors get an all-zero
+    ``non_neighbor_mask`` (the placeholder windows are ignored by the loss, which
+    falls back to the cross-recording negatives for those samples).
+
+    Args:
+        mc_sample_size: Number ``M`` of neighbor / non-neighbor windows sampled
+            per reference (Monte-Carlo sample size, as in the original TNC).
+        neighbor_range: Half-width ``η`` (in samples) of the temporal
+            neighborhood; neighbors are sampled from ``[t-η, t+η]``.
+        non_neighbor_gap: Minimum offset distance ``δ`` (in samples) for a window
+            to count as a non-neighbor. Should be ``>= neighbor_range``; set it to
+            a multiple of ``segment_length`` to make negatives non-overlapping with
+            the reference.
+    """
+
+    def __init__(
+        self,
+        *args,
+        mc_sample_size: int = 5,
+        neighbor_range: int = 240,
+        non_neighbor_gap: int = 480,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        if mc_sample_size < 1:
+            raise ValueError("mc_sample_size must be >= 1.")
+        if neighbor_range < 0 or non_neighbor_gap < 0:
+            raise ValueError("neighbor_range and non_neighbor_gap must be >= 0.")
+        if non_neighbor_gap < neighbor_range:
+            logger.warning(
+                "non_neighbor_gap (%d) < neighbor_range (%d): neighbor and "
+                "non-neighbor regions overlap.",
+                non_neighbor_gap,
+                neighbor_range,
+            )
+        self.mc_sample_size = mc_sample_size
+        self.neighbor_range = neighbor_range
+        self.non_neighbor_gap = non_neighbor_gap
+
+    def _window(self, series: np.ndarray, user_id: int, offset: int) -> np.ndarray:
+        """Extract and (optionally) scale a single window at ``offset``."""
+        segment = series[offset : offset + self.segment_length, self.channels]
+        if self.sample_scaling_method is not None:
+            if self.sample_scaling_method.func.__name__ == "min_max_scaling_per_user":
+                segment = (segment - self.user_mins[user_id]) / (
+                    self.user_maxs[user_id] - self.user_mins[user_id] + 1e-8
+                )
+            else:
+                raise NotImplementedError(
+                    "Sample scaling method not implemented yet for the new online dataset format"
+                )
+        return segment
+
+    @staticmethod
+    def _sample_within(center: int, radius: int, max_start: int, n: int) -> torch.Tensor:
+        """Sample ``n`` start offsets in ``[center-radius, center+radius]`` (clamped)."""
+        low = max(0, center - radius)
+        high = min(max_start, center + radius)  # inclusive
+        return torch.randint(low, high + 1, (n,))
+
+    @staticmethod
+    def _sample_outside(
+        center: int, gap: int, max_start: int, n: int
+    ) -> tuple[torch.Tensor, bool]:
+        """Sample ``n`` start offsets at distance > ``gap`` from ``center``.
+
+        Returns the offsets and a validity flag. When the recording cannot supply
+        any far-enough offset the flag is ``False`` and the offsets are placeholder
+        zeros (to be masked out by the loss).
+        """
+        left_high = center - gap  # valid left offsets: [0, left_high]
+        right_low = center + gap  # valid right offsets: [right_low, max_start]
+        left_size = left_high + 1 if left_high >= 0 else 0
+        right_size = (max_start - right_low + 1) if right_low <= max_start else 0
+        total = left_size + right_size
+        if total <= 0:
+            return torch.zeros(n, dtype=torch.long), False
+        r = torch.randint(0, total, (n,))
+        offsets = torch.where(r < left_size, r, right_low + (r - left_size))
+        return offsets, True
+
+    def __getitem__(self, idx: int) -> dict:
+        sample = super().__getitem__(idx)
+
+        series_idx = int(self.idx_to_series[idx])
+        ref_offset = int(self.idx_to_position[idx])
+        series = self.data[series_idx]["data"]
+        user_id = self.data[series_idx]["user"]
+        max_start = series.shape[0] - self.segment_length  # inclusive max offset
+        m = self.mc_sample_size
+
+        neighbor_offsets = self._sample_within(
+            ref_offset, self.neighbor_range, max_start, m
+        )
+        non_neighbor_offsets, valid = self._sample_outside(
+            ref_offset, self.non_neighbor_gap, max_start, m
+        )
+
+        neighbors = np.stack(
+            [self._window(series, user_id, int(o)) for o in neighbor_offsets]
+        )
+        non_neighbors = np.stack(
+            [self._window(series, user_id, int(o)) for o in non_neighbor_offsets]
+        )
+
+        sample["x_neighbors"] = torch.from_numpy(neighbors).float()
+        sample["x_non_neighbors"] = torch.from_numpy(non_neighbors).float()
+        sample["non_neighbor_mask"] = torch.full(
+            (m,), float(valid), dtype=torch.float
+        )
+        return sample

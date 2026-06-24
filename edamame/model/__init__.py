@@ -8,6 +8,7 @@ from edamame.model.encoder_decoder import EncoderDecoderModel
 from edamame.model.matton_constrastive import ContrastiveModel
 from edamame.model.efficientnet_contrastive import EfficientNetContrastive, MBConv1D
 from edamame.model.mantis_contrastive import MantisContrastive
+from edamame.model.tnc import TNCModel
 from edamame.model.resnet_contrastive import (
     ResNetContrastive,
     BasicBlock1D,
@@ -26,6 +27,7 @@ __all__ = [
     'EfficientNetContrastive',
     'MBConv1D',
     'MantisContrastive',
+    'TNCModel',
     'ResNetContrastive',
     'BasicBlock1D',
     'BottleneckBlock1D',

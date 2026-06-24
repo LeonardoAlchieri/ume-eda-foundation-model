@@ -99,3 +99,6 @@ venv.bak/
 *.log# pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# Claude Code
+CLAUDE.md

@@ -11,10 +11,12 @@ from edamame.engine.base import BaseSelfSupervisedEngine
 from edamame.engine.reconstruction import ReconstructionEngine
 from edamame.engine.contrastive import ContrastiveEngine
 from edamame.engine.mantis_contrastive import MantisContrastiveEngine
+from edamame.engine.tnc import TNCEngine
 
 __all__ = [
     "BaseSelfSupervisedEngine",
     "ReconstructionEngine",
     "ContrastiveEngine",
     "MantisContrastiveEngine",
+    "TNCEngine",
 ]

@@ -88,7 +88,7 @@ class EdamamePipeline:
         Load a pretrained model from checkpoint.
 
         Args:
-            model_name: Name of the model architecture (e.g., "mae", "efficientnet", "mantis")
+            model_name: Name of the model architecture (e.g., "mae", "efficientnet", "mantis", "tnc")
             weights_path: Path to the checkpoint file (.ckpt)
             model_config: Path to model config file or config dict.
                          If None, will try to extract from checkpoint.
@@ -133,9 +133,11 @@ class EdamamePipeline:
             model = cls._load_efficientnet_model(config_dict, checkpoint, torch_dtype)
         elif model_name.lower() == "mantis":
             model = cls._load_mantis_model(config_dict, checkpoint, torch_dtype)
+        elif model_name.lower() in ("tnc", "tncmodel"):
+            model = cls._load_tnc_model(config_dict, checkpoint, torch_dtype)
         else:
             raise ValueError(
-                f"Model '{model_name}' not supported. Currently supported: 'mae', 'efficientnet', 'mantis'."
+                f"Model '{model_name}' not supported. Currently supported: 'mae', 'efficientnet', 'mantis', 'tnc'."
             )
 
         # Create pipeline instance
@@ -360,6 +362,116 @@ class EdamamePipeline:
         return model
 
     @staticmethod
+    def _load_tnc_model(
+        config_dict: Dict[str, Any],
+        checkpoint: Dict[str, Any],
+        torch_dtype: Optional[torch.dtype] = None,
+    ) -> nn.Module:
+        """
+        Load Temporal Neighborhood Coding (TNC) model.
+
+        TNC wraps a single-view encoder (an EfficientNetContrastive by default) with
+        a learnable neighborhood discriminator (TNCLoss). For downstream feature
+        extraction only the encoder is used (via ``get_representation``), but the
+        full model is rebuilt so the checkpoint's encoder weights load cleanly.
+
+        Args:
+            config_dict: Model configuration. If it contains an ``encoder`` (and
+                optional ``loss_fn``) sub-config those are used directly; otherwise
+                the architecture is inferred from the state dict.
+            checkpoint: Loaded checkpoint
+            torch_dtype: Data type for model
+
+        Returns:
+            Loaded TNC model
+        """
+        from edamame.model.tnc import TNCModel
+        from edamame.model.efficientnet_contrastive import EfficientNetContrastive
+        from edamame.model.loss.tnc import TNCLoss
+
+        # Extract state dict - handle different checkpoint formats
+        if "state_dict" in checkpoint:
+            state_dict = checkpoint["state_dict"]
+            # Remove the Lightning 'model.' prefix (only the leading one, so that
+            # nested keys like 'encoder.stem_conv...' / 'loss_fn.discriminator...'
+            # are preserved).
+            state_dict = {
+                (k[len("model.") :] if k.startswith("model.") else k): v
+                for k, v in state_dict.items()
+            }
+        else:
+            state_dict = checkpoint
+
+        # Resolve encoder / loss_fn configs (explicit config wins, else infer).
+        if config_dict and "encoder" in config_dict:
+            encoder_cfg = dict(config_dict["encoder"])
+            # The encoder carries no objective of its own under TNC.
+            encoder_cfg.setdefault("loss_fn", None)
+            loss_cfg = dict(config_dict.get("loss_fn", {}) or {})
+        else:
+            encoder_cfg, loss_cfg = EdamamePipeline._infer_tnc_config_from_state_dict(
+                state_dict
+            )
+
+        encoder = EfficientNetContrastive(**encoder_cfg)
+        loss_fn = TNCLoss(**loss_cfg)
+        model = TNCModel(encoder=encoder, loss_fn=loss_fn)
+
+        # Load weights (non-strict: discriminator keys may be absent/extra)
+        model.load_state_dict(state_dict, strict=False)
+
+        # Convert dtype if specified
+        if torch_dtype is not None:
+            model = model.to(dtype=torch_dtype)
+
+        return model
+
+    @staticmethod
+    def _infer_tnc_config_from_state_dict(
+        state_dict: Dict[str, torch.Tensor],
+    ) -> tuple:
+        """
+        Infer TNC encoder and loss configurations from a state dictionary.
+
+        The encoder config is recovered by reusing the EfficientNet inference on the
+        ``encoder.``-prefixed keys; the loss (discriminator) config is recovered from
+        the ``loss_fn.discriminator.`` linear layers.
+
+        Args:
+            state_dict: Model state dictionary
+
+        Returns:
+            Tuple ``(encoder_cfg, loss_cfg)`` of keyword-argument dicts.
+        """
+        # Strip the 'encoder.' prefix and reuse the EfficientNet inference.
+        encoder_state = {
+            k[len("encoder.") :]: v
+            for k, v in state_dict.items()
+            if k.startswith("encoder.")
+        }
+        encoder_cfg = EdamamePipeline._infer_efficientnet_config_from_state_dict(
+            encoder_state
+        )
+        # The encoder carries no objective of its own under TNC.
+        encoder_cfg["loss_fn"] = None
+
+        # Infer discriminator (TNCLoss) sizing from its first linear layer.
+        # discriminator.0.weight has shape (hidden, 2 * embedding_dim).
+        loss_cfg: Dict[str, Any] = {}
+        first_linear = state_dict.get("loss_fn.discriminator.0.weight")
+        if first_linear is not None:
+            hidden, two_d = first_linear.shape
+            embedding_dim = two_d // 2
+            loss_cfg["embedding_dim"] = embedding_dim
+            if embedding_dim > 0:
+                loss_cfg["hidden_multiplier"] = max(1, hidden // embedding_dim)
+        else:
+            # Fall back to the encoder's embedding dimension.
+            loss_cfg["embedding_dim"] = encoder_cfg.get("embedding_dim", 64)
+
+        return encoder_cfg, loss_cfg
+
+    @staticmethod
     def _infer_mantis_config_from_state_dict(
         state_dict: Dict[str, torch.Tensor],
     ) -> Dict[str, Any]:
@@ -532,6 +644,7 @@ class EdamamePipeline:
         
         For EfficientNet models, this returns the embedding from the encoder.
         For Mantis models, this returns the embedding from the encoder.
+        For TNC models, this returns the embedding from the wrapped encoder.
 
         Args:
             x: Input tensor of shape (batch_size, seq_len, in_channels)
@@ -575,7 +688,14 @@ class EdamamePipeline:
                 if return_mask:
                     return embeddings, mask, ids_restore
                 return embeddings
-            elif self.model_name.lower() in ["efficientnet", "efficientnetcontrastive", "mantis", "mantiscontrastive"]:
+            elif self.model_name.lower() in [
+                "efficientnet",
+                "efficientnetcontrastive",
+                "mantis",
+                "mantiscontrastive",
+                "tnc",
+                "tncmodel",
+            ]:
                 # Use get_representation method for contrastive models
                 embeddings = self.model.get_representation(x)
                 return embeddings

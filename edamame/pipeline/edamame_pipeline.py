@@ -6,9 +6,12 @@ for embedding extraction and inference tasks.
 """
 
 from pathlib import Path
-from typing import Dict, Optional, Union, Any, Callable
+from typing import Dict, Optional, Union, Any, Callable, Tuple, List
+import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import TensorDataset, DataLoader
 from omegaconf import DictConfig, OmegaConf
 import yaml
 
@@ -69,6 +72,11 @@ class EdamamePipeline:
         self.device = device
         self.model_config = model_config or {}
         # self.normalization_fn = normalization_fn
+
+        # Fine-tuning state (populated by `fit`)
+        self.head: Optional[nn.Module] = None
+        self.classes_: Optional[np.ndarray] = None
+        self.num_classes: Optional[int] = None
 
         # Set model to evaluation mode
         self.model.eval()
@@ -639,6 +647,290 @@ class EdamamePipeline:
                     f"Reconstruct method not implemented for model: {self.model_name}. "
                     f"Only MAE models support reconstruction."
                 )
+
+    # ------------------------------------------------------------------ #
+    # Supervised fine-tuning (scikit-learn / Mantis-style API)
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _to_tensor(X: Union[torch.Tensor, np.ndarray, Any]) -> torch.Tensor:
+        """Convert input to a float32 tensor without moving it to a device."""
+        if isinstance(X, torch.Tensor):
+            return X.float()
+        return torch.as_tensor(np.asarray(X), dtype=torch.float32)
+
+    def _forward_logits(self, x: torch.Tensor) -> torch.Tensor:
+        """Backbone representation -> classification head logits."""
+        representation = self.model.get_representation(x)
+        if representation.dim() != 2:
+            raise ValueError(
+                f"Fine-tuning expects the backbone to return a 2D "
+                f"(batch, features) representation, got shape "
+                f"{tuple(representation.shape)}. This is supported for the "
+                f"EfficientNet (UME) encoder; MAE returns per-patch tokens "
+                f"and is not supported."
+            )
+        return self.head(representation)
+
+    def fit(
+        self,
+        X: Union[torch.Tensor, np.ndarray],
+        y: Union[torch.Tensor, np.ndarray, List],
+        fine_tuning_type: str = "full",
+        learning_rate: float = 1e-3,
+        backbone_lr: Optional[float] = None,
+        batch_size: int = 64,
+        num_epochs: int = 100,
+        weight_decay: float = 0.0,
+        validation_data: Optional[Tuple[Any, Any]] = None,
+        validation_split: float = 0.0,
+        class_weight: Optional[Union[str, torch.Tensor]] = None,
+        verbose: bool = True,
+    ) -> "EdamamePipeline":
+        """
+        Fine-tune the pretrained UME (EfficientNet) encoder for classification.
+
+        A linear classification head is attached on top of the encoder's
+        embedding and trained with cross-entropy. Mirrors the Mantis
+        ``MantisTrainer`` API: call ``fit(X, y)`` then ``predict`` /
+        ``predict_proba``.
+
+        Args:
+            X: Input signals of shape (n_samples, seq_len, in_channels)
+               (e.g. (n, 240, 3)). A 2D array (n, seq_len) is treated as a
+               single channel.
+            y: Class labels of shape (n_samples,). Labels may be arbitrary
+               (ints or strings); they are encoded internally and the
+               original values are restored by ``predict``.
+            fine_tuning_type: One of
+                - "full" (default): fine-tune the whole encoder + head.
+                - "head": freeze the encoder (linear probe), train head only.
+                - "scratch": re-initialise the encoder and train everything
+                  from random weights (ignores the pretrained checkpoint).
+            learning_rate: LR for the head (and for the backbone when
+                ``backbone_lr`` is None).
+            backbone_lr: Optional separate (typically smaller) LR for the
+                encoder. Only used for "full"/"scratch". Defaults to
+                ``learning_rate``.
+            batch_size: Mini-batch size.
+            num_epochs: Number of training epochs.
+            weight_decay: AdamW weight decay.
+            validation_data: Optional ``(X_val, y_val)`` for per-epoch
+                validation accuracy reporting. Takes precedence over
+                ``validation_split`` if both are given.
+            validation_split: Fraction of the training data (in ``(0, 1)``)
+                to hold out for per-epoch validation accuracy reporting. The
+                split is stratified by label and only used when
+                ``validation_data`` is None. No early stopping is performed;
+                the held-out set is only used for reporting. Defaults to 0.0
+                (no validation).
+            class_weight: Optional cross-entropy class weights. Pass
+                "balanced" for inverse-frequency weighting, or a tensor of
+                shape (num_classes,).
+            verbose: Print per-epoch loss/accuracy.
+
+        Returns:
+            self (fitted pipeline).
+
+        Example:
+            >>> pipeline = EdamamePipeline.from_pretrained(
+            ...     model_name="efficientnet", weights_path="artifacts/ume.ckpt")
+            >>> pipeline.fit(X, y)              # y = vector of class labels
+            >>> probs = pipeline.predict_proba(X)
+            >>> y_pred = pipeline.predict(X)
+        """
+        if self.model_name.lower() not in (
+            "efficientnet",
+            "efficientnetcontrastive",
+        ):
+            raise NotImplementedError(
+                f"Fine-tuning is only supported for the EfficientNet (UME) "
+                f"encoder, got model_name='{self.model_name}'."
+            )
+        if fine_tuning_type not in ("full", "head", "scratch"):
+            raise ValueError(
+                f"fine_tuning_type must be one of 'full', 'head', 'scratch', "
+                f"got '{fine_tuning_type}'."
+            )
+
+        X_t = self._to_tensor(X)
+        y_arr = np.asarray(y).reshape(-1)
+        if X_t.shape[0] != y_arr.shape[0]:
+            raise ValueError(
+                f"X and y have mismatched number of samples: "
+                f"{X_t.shape[0]} vs {y_arr.shape[0]}."
+            )
+
+        # Encode labels -> contiguous integer ids, remember originals.
+        self.classes_, y_encoded = np.unique(y_arr, return_inverse=True)
+        self.num_classes = len(self.classes_)
+        y_t = torch.as_tensor(y_encoded, dtype=torch.long)
+
+        # Optionally hold out a stratified fraction for validation reporting.
+        # Only used when no explicit validation_data is provided.
+        if validation_data is None and validation_split > 0.0:
+            if not 0.0 < validation_split < 1.0:
+                raise ValueError(
+                    f"validation_split must be in (0, 1), got {validation_split}."
+                )
+            rng = np.random.default_rng(0)
+            val_idx_parts: List[np.ndarray] = []
+            for cls in range(self.num_classes):
+                cls_idx = np.flatnonzero(y_encoded == cls)
+                rng.shuffle(cls_idx)
+                n_val = int(round(len(cls_idx) * validation_split))
+                val_idx_parts.append(cls_idx[:n_val])
+            val_idx = np.concatenate(val_idx_parts) if val_idx_parts else np.array([], dtype=int)
+            train_mask = np.ones(X_t.shape[0], dtype=bool)
+            train_mask[val_idx] = False
+            train_idx = np.flatnonzero(train_mask)
+
+            validation_data = (X_t[val_idx], self.classes_[y_encoded[val_idx]])
+            X_t = X_t[train_idx]
+            y_t = y_t[train_idx]
+            y_encoded = y_encoded[train_idx]
+            if verbose:
+                print(
+                    f"Holding out {len(val_idx)} samples "
+                    f"({validation_split:.0%}) for validation."
+                )
+
+        # Optionally reset the backbone to random weights ("scratch").
+        if fine_tuning_type == "scratch":
+            def _reset(module: nn.Module) -> None:
+                if hasattr(module, "reset_parameters"):
+                    module.reset_parameters()
+            self.model.apply(_reset)
+
+        # Infer feature dimension from a real forward pass and build the head.
+        self.model.to(self.device)
+        with torch.no_grad():
+            self.model.eval()
+            feat = self.model.get_representation(X_t[:1].to(self.device))
+        if feat.dim() != 2:
+            raise ValueError(
+                f"Backbone returned a {feat.dim()}D representation; a 2D "
+                f"(batch, features) output is required for classification."
+            )
+        feat_dim = feat.shape[1]
+        self.head = nn.Linear(feat_dim, self.num_classes).to(self.device)
+
+        # Freeze / unfreeze backbone according to the strategy.
+        train_backbone = fine_tuning_type in ("full", "scratch")
+        for p in self.model.parameters():
+            p.requires_grad = train_backbone
+
+        # Optimizer parameter groups.
+        param_groups: List[dict] = [
+            {"params": self.head.parameters(), "lr": learning_rate}
+        ]
+        if train_backbone:
+            param_groups.append(
+                {
+                    "params": self.model.parameters(),
+                    "lr": backbone_lr if backbone_lr is not None else learning_rate,
+                }
+            )
+        optimizer = torch.optim.AdamW(param_groups, weight_decay=weight_decay)
+
+        # Class weights.
+        weight_tensor: Optional[torch.Tensor] = None
+        if class_weight == "balanced":
+            counts = np.bincount(y_encoded, minlength=self.num_classes)
+            inv = len(y_encoded) / (self.num_classes * np.maximum(counts, 1))
+            weight_tensor = torch.as_tensor(inv, dtype=torch.float32, device=self.device)
+        elif isinstance(class_weight, torch.Tensor):
+            weight_tensor = class_weight.to(self.device).float()
+        criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+
+        loader = DataLoader(
+            TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=True
+        )
+
+        for epoch in range(num_epochs):
+            self.model.train(train_backbone)  # keep BN frozen for linear probe
+            self.head.train()
+            running_loss, correct, total = 0.0, 0, 0
+            for xb, yb in loader:
+                xb = xb.to(self.device)
+                yb = yb.to(self.device)
+                optimizer.zero_grad()
+                logits = self._forward_logits(xb)
+                loss = criterion(logits, yb)
+                loss.backward()
+                optimizer.step()
+
+                running_loss += loss.item() * xb.size(0)
+                correct += (logits.argmax(dim=1) == yb).sum().item()
+                total += xb.size(0)
+
+            if verbose:
+                msg = (
+                    f"Epoch {epoch + 1}/{num_epochs} - "
+                    f"loss: {running_loss / total:.4f} - "
+                    f"acc: {correct / total:.4f}"
+                )
+                if validation_data is not None:
+                    Xv, yv = validation_data
+                    val_pred = self.predict(Xv)
+                    val_acc = float(np.mean(val_pred == np.asarray(yv).reshape(-1)))
+                    msg += f" - val_acc: {val_acc:.4f}"
+                print(msg)
+
+        # Leave everything in eval mode for inference.
+        self.model.eval()
+        self.head.eval()
+        return self
+
+    def predict_proba(
+        self,
+        X: Union[torch.Tensor, np.ndarray],
+        batch_size: int = 256,
+    ) -> np.ndarray:
+        """
+        Predict class probabilities for ``X``.
+
+        Args:
+            X: Input signals of shape (n_samples, seq_len, in_channels).
+            batch_size: Inference batch size.
+
+        Returns:
+            Array of shape (n_samples, num_classes) with softmax probabilities.
+            Column ``j`` corresponds to ``self.classes_[j]``.
+        """
+        if self.head is None:
+            raise RuntimeError("Pipeline has not been fine-tuned. Call `fit` first.")
+
+        X_t = self._to_tensor(X)
+        self.model.eval()
+        self.head.eval()
+
+        probs: List[torch.Tensor] = []
+        with torch.no_grad():
+            for start in range(0, X_t.shape[0], batch_size):
+                xb = X_t[start : start + batch_size].to(self.device)
+                logits = self._forward_logits(xb)
+                probs.append(F.softmax(logits, dim=1).cpu())
+        return torch.cat(probs, dim=0).numpy()
+
+    def predict(
+        self,
+        X: Union[torch.Tensor, np.ndarray],
+        batch_size: int = 256,
+    ) -> np.ndarray:
+        """
+        Predict class labels for ``X``.
+
+        Args:
+            X: Input signals of shape (n_samples, seq_len, in_channels).
+            batch_size: Inference batch size.
+
+        Returns:
+            Array of shape (n_samples,) with predicted labels, in the original
+            label space passed to ``fit``.
+        """
+        proba = self.predict_proba(X, batch_size=batch_size)
+        indices = proba.argmax(axis=1)
+        return self.classes_[indices]
 
     def __call__(
         self,

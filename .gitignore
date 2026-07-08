@@ -3,6 +3,7 @@
 tables*
 lightning_logs/
 .pixi
+CLAUDE.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

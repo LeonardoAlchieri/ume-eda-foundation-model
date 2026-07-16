@@ -5,6 +5,7 @@ This module provides a unified interface for loading and using pretrained models
 for embedding extraction and inference tasks.
 """
 
+import copy
 from pathlib import Path
 from typing import Dict, Optional, Union, Any, Callable, Tuple, List
 import numpy as np
@@ -671,6 +672,53 @@ class EdamamePipeline:
             )
         return self.head(representation)
 
+    def _evaluate(
+        self,
+        X: Union[torch.Tensor, np.ndarray],
+        y: Union[torch.Tensor, np.ndarray, List],
+        criterion: nn.Module,
+        batch_size: int = 256,
+    ) -> Dict[str, float]:
+        """
+        Evaluate the current backbone + head on ``(X, y)`` in a single pass.
+
+        Labels are expected in the original (pre-encoding) space and are mapped
+        back to the integer ids learned in ``fit`` via ``self.classes_``.
+
+        Returns:
+            Dict with keys ``loss`` (mean cross-entropy under ``criterion``),
+            ``acc`` (accuracy) and ``macro_f1`` (macro-averaged F1).
+        """
+        from sklearn.metrics import accuracy_score, f1_score
+
+        X_t = self._to_tensor(X)
+        y_arr = np.asarray(y).reshape(-1)
+        class_to_idx = {cls: idx for idx, cls in enumerate(self.classes_)}
+        y_enc = np.array([class_to_idx[v] for v in y_arr])
+
+        self.model.eval()
+        self.head.eval()
+        total_loss = 0.0
+        preds: List[torch.Tensor] = []
+        with torch.no_grad():
+            for start in range(0, X_t.shape[0], batch_size):
+                xb = X_t[start : start + batch_size].to(self.device)
+                yb = torch.as_tensor(
+                    y_enc[start : start + batch_size],
+                    dtype=torch.long,
+                    device=self.device,
+                )
+                logits = self._forward_logits(xb)
+                total_loss += criterion(logits, yb).item() * xb.size(0)
+                preds.append(logits.argmax(dim=1).cpu())
+
+        y_pred = torch.cat(preds).numpy()
+        return {
+            "loss": total_loss / len(y_enc),
+            "acc": float(accuracy_score(y_enc, y_pred)),
+            "macro_f1": float(f1_score(y_enc, y_pred, average="macro")),
+        }
+
     def fit(
         self,
         X: Union[torch.Tensor, np.ndarray],
@@ -684,6 +732,12 @@ class EdamamePipeline:
         validation_data: Optional[Tuple[Any, Any]] = None,
         validation_split: float = 0.0,
         class_weight: Optional[Union[str, torch.Tensor]] = None,
+        early_stopping: bool = False,
+        patience: int = 10,
+        monitor: str = "val_macro_f1",
+        min_delta: float = 0.0,
+        restore_best_weights: bool = True,
+        use_layer_norm: bool = True,
         verbose: bool = True,
     ) -> "EdamamePipeline":
         """
@@ -726,6 +780,27 @@ class EdamamePipeline:
             class_weight: Optional cross-entropy class weights. Pass
                 "balanced" for inverse-frequency weighting, or a tensor of
                 shape (num_classes,).
+            early_stopping: If True, stop training once the monitored
+                validation metric stops improving. Requires a validation set
+                (via ``validation_data`` or ``validation_split``); raises
+                otherwise. Off by default (all ``num_epochs`` are run).
+            patience: Number of epochs to wait with no improvement in the
+                monitored metric before stopping. Only used when
+                ``early_stopping`` is True.
+            monitor: Validation metric that early stopping watches. One of
+                "val_macro_f1" (default, maximized; matches Pulse-PPG and is
+                robust to class imbalance), "val_acc" (maximized), or
+                "val_loss" (minimized).
+            min_delta: Minimum change in the monitored metric to qualify as an
+                improvement. Improvements smaller than this are ignored.
+            restore_best_weights: If True (default), roll the encoder + head
+                back to the epoch with the best monitored metric when training
+                ends (whether by early stopping or by exhausting ``num_epochs``).
+                This is the "best checkpoint" selection used by Pulse-PPG.
+            use_layer_norm: If True (default), prepend a LayerNorm over the
+                encoder's embedding before the linear classification layer
+                (LayerNorm -> Linear head), matching the head used by Mantis
+                and Pulse-PPG. Set to False for a bare linear head.
             verbose: Print per-epoch loss/accuracy.
 
         Returns:
@@ -812,7 +887,13 @@ class EdamamePipeline:
                 f"(batch, features) output is required for classification."
             )
         feat_dim = feat.shape[1]
-        self.head = nn.Linear(feat_dim, self.num_classes).to(self.device)
+        if use_layer_norm:
+            self.head = nn.Sequential(
+                nn.LayerNorm(feat_dim),
+                nn.Linear(feat_dim, self.num_classes),
+            ).to(self.device)
+        else:
+            self.head = nn.Linear(feat_dim, self.num_classes).to(self.device)
 
         # Freeze / unfreeze backbone according to the strategy.
         train_backbone = fine_tuning_type in ("full", "scratch")
@@ -846,10 +927,38 @@ class EdamamePipeline:
             TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=True
         )
 
+        # ---- Early-stopping setup ----
+        from sklearn.metrics import f1_score
+
+        # metric name -> ("min"/"max" direction, key returned by _evaluate)
+        monitor_spec = {
+            "val_loss": ("min", "loss"),
+            "val_acc": ("max", "acc"),
+            "val_macro_f1": ("max", "macro_f1"),
+        }
+        if early_stopping:
+            if monitor not in monitor_spec:
+                raise ValueError(
+                    f"monitor must be one of {sorted(monitor_spec)}, got "
+                    f"'{monitor}'."
+                )
+            if validation_data is None:
+                raise ValueError(
+                    "early_stopping=True requires a validation set. Pass "
+                    "validation_data=(X_val, y_val) or set validation_split > 0."
+                )
+        mode, metric_key = monitor_spec.get(monitor, ("max", "macro_f1"))
+        best_score: Optional[float] = None
+        best_state: Optional[Dict[str, Any]] = None
+        best_epoch = 0
+        epochs_no_improve = 0
+
         for epoch in range(num_epochs):
             self.model.train(train_backbone)  # keep BN frozen for linear probe
             self.head.train()
-            running_loss, correct, total = 0.0, 0, 0
+            running_loss, total = 0.0, 0
+            train_preds: List[torch.Tensor] = []
+            train_targets: List[torch.Tensor] = []
             for xb, yb in loader:
                 xb = xb.to(self.device)
                 yb = yb.to(self.device)
@@ -860,21 +969,76 @@ class EdamamePipeline:
                 optimizer.step()
 
                 running_loss += loss.item() * xb.size(0)
-                correct += (logits.argmax(dim=1) == yb).sum().item()
                 total += xb.size(0)
+                train_preds.append(logits.argmax(dim=1).detach().cpu())
+                train_targets.append(yb.detach().cpu())
+
+            train_f1 = float(
+                f1_score(
+                    torch.cat(train_targets).numpy(),
+                    torch.cat(train_preds).numpy(),
+                    average="macro",
+                )
+            )
+
+            # Validation metrics (needed for reporting and/or early stopping).
+            val_metrics: Optional[Dict[str, float]] = None
+            if validation_data is not None:
+                Xv, yv = validation_data
+                val_metrics = self._evaluate(
+                    Xv, yv, criterion, batch_size=batch_size
+                )
 
             if verbose:
                 msg = (
                     f"Epoch {epoch + 1}/{num_epochs} - "
                     f"loss: {running_loss / total:.4f} - "
-                    f"acc: {correct / total:.4f}"
+                    f"macro_f1: {train_f1:.4f}"
                 )
-                if validation_data is not None:
-                    Xv, yv = validation_data
-                    val_pred = self.predict(Xv)
-                    val_acc = float(np.mean(val_pred == np.asarray(yv).reshape(-1)))
-                    msg += f" - val_acc: {val_acc:.4f}"
+                if val_metrics is not None:
+                    msg += f" - val_macro_f1: {val_metrics['macro_f1']:.4f}"
                 print(msg)
+
+            # ---- Early stopping / best-checkpoint tracking ----
+            if early_stopping:
+                score = val_metrics[metric_key]  # type: ignore[index]
+                if best_score is None:
+                    improved = True
+                elif mode == "max":
+                    improved = score > best_score + min_delta
+                else:
+                    improved = score < best_score - min_delta
+
+                if improved:
+                    best_score = score
+                    best_epoch = epoch + 1
+                    epochs_no_improve = 0
+                    if restore_best_weights:
+                        best_state = {
+                            "model": copy.deepcopy(self.model.state_dict()),
+                            "head": copy.deepcopy(self.head.state_dict()),
+                        }
+                else:
+                    epochs_no_improve += 1
+                    if epochs_no_improve >= patience:
+                        if verbose:
+                            print(
+                                f"Early stopping at epoch {epoch + 1}: no "
+                                f"{monitor} improvement for {patience} epochs "
+                                f"(best {monitor}: {best_score:.4f} "
+                                f"@ epoch {best_epoch})."
+                            )
+                        break
+
+        # Restore the best checkpoint seen during training.
+        if early_stopping and restore_best_weights and best_state is not None:
+            self.model.load_state_dict(best_state["model"])
+            self.head.load_state_dict(best_state["head"])
+            if verbose:
+                print(
+                    f"Restored best weights from epoch {best_epoch} "
+                    f"(best {monitor}: {best_score:.4f})."
+                )
 
         # Leave everything in eval mode for inference.
         self.model.eval()

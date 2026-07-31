@@ -737,6 +737,7 @@ class EdamamePipeline:
         monitor: str = "val_macro_f1",
         min_delta: float = 0.0,
         restore_best_weights: bool = True,
+        refit_on_full_data: bool = False,
         use_layer_norm: bool = True,
         verbose: bool = True,
     ) -> "EdamamePipeline":
@@ -797,6 +798,21 @@ class EdamamePipeline:
                 back to the epoch with the best monitored metric when training
                 ends (whether by early stopping or by exhausting ``num_epochs``).
                 This is the "best checkpoint" selection used by Pulse-PPG.
+                Ignored when ``refit_on_full_data`` is True (the refit
+                replaces the phase-1 model entirely).
+            refit_on_full_data: If True, training runs in two phases.
+                Phase 1 trains with the validation hold-out and early
+                stopping, only to determine the optimal training budget
+                (the optimizer-step count of the best epoch — steps, not
+                epochs, because the full dataset has more batches per
+                epoch). Phase 2 then resets the encoder + head to their
+                initial weights, rebuilds the optimizer, and retrains on
+                100% of the data (training + validation combined) for that
+                step budget, with no validation set. Use this on small
+                datasets where permanently holding out labels hurts the
+                final model. Requires ``early_stopping=True``. Note the
+                refit model cannot be validated internally — rely on an
+                outer evaluation loop (e.g. LOPO) for unbiased estimates.
             use_layer_norm: If True (default), prepend a LayerNorm over the
                 encoder's embedding before the linear classification layer
                 (LayerNorm -> Linear head), matching the head used by Mantis
@@ -826,6 +842,12 @@ class EdamamePipeline:
                 f"fine_tuning_type must be one of 'full', 'head', 'scratch', "
                 f"got '{fine_tuning_type}'."
             )
+        if refit_on_full_data and not early_stopping:
+            raise ValueError(
+                "refit_on_full_data=True requires early_stopping=True: the "
+                "validated stopping point is what determines the refit's "
+                "training budget."
+            )
 
         X_t = self._to_tensor(X)
         y_arr = np.asarray(y).reshape(-1)
@@ -839,6 +861,31 @@ class EdamamePipeline:
         self.classes_, y_encoded = np.unique(y_arr, return_inverse=True)
         self.num_classes = len(self.classes_)
         y_t = torch.as_tensor(y_encoded, dtype=torch.long)
+
+        # Keep the untouched full training set around for the refit phase.
+        X_full: Optional[torch.Tensor] = None
+        y_full: Optional[torch.Tensor] = None
+        if refit_on_full_data:
+            if validation_data is not None:
+                Xv_full = self._to_tensor(validation_data[0])
+                yv_arr = np.asarray(validation_data[1]).reshape(-1)
+                unknown = np.setdiff1d(yv_arr, self.classes_)
+                if unknown.size:
+                    raise ValueError(
+                        f"validation_data contains labels not present in the "
+                        f"training labels: {unknown.tolist()}. All classes "
+                        f"must appear in y when refit_on_full_data=True."
+                    )
+                yv_encoded = np.searchsorted(self.classes_, yv_arr)
+                X_full = torch.cat([X_t, Xv_full], dim=0)
+                y_full = torch.cat(
+                    [y_t, torch.as_tensor(yv_encoded, dtype=torch.long)]
+                )
+            else:
+                # validation_split carves the hold-out out of X_t below;
+                # these references keep the pre-split tensors.
+                X_full = X_t
+                y_full = y_t
 
         # Optionally hold out a stratified fraction for validation reporting.
         # Only used when no explicit validation_data is provided.
@@ -899,6 +946,15 @@ class EdamamePipeline:
         train_backbone = fine_tuning_type in ("full", "scratch")
         for p in self.model.parameters():
             p.requires_grad = train_backbone
+
+        # Snapshot the starting weights so the refit phase can replay
+        # training from the same initialization on the full dataset.
+        initial_state: Optional[Dict[str, Any]] = None
+        if refit_on_full_data:
+            initial_state = {
+                "model": copy.deepcopy(self.model.state_dict()),
+                "head": copy.deepcopy(self.head.state_dict()),
+            }
 
         # Optimizer parameter groups.
         param_groups: List[dict] = [
@@ -1013,7 +1069,7 @@ class EdamamePipeline:
                     best_score = score
                     best_epoch = epoch + 1
                     epochs_no_improve = 0
-                    if restore_best_weights:
+                    if restore_best_weights and not refit_on_full_data:
                         best_state = {
                             "model": copy.deepcopy(self.model.state_dict()),
                             "head": copy.deepcopy(self.head.state_dict()),
@@ -1039,6 +1095,84 @@ class EdamamePipeline:
                     f"Restored best weights from epoch {best_epoch} "
                     f"(best {monitor}: {best_score:.4f})."
                 )
+
+        # ---- Refit phase: replay training on 100% of the data ----
+        # Phase 1 above only served to find the stopping point. Reset to the
+        # initial weights and retrain on the full dataset for the same number
+        # of optimizer *steps* as the best epoch (steps rather than epochs,
+        # since the full loader has more batches per epoch).
+        if refit_on_full_data:
+            assert (
+                initial_state is not None
+                and X_full is not None
+                and y_full is not None
+            )
+            best_step = best_epoch * len(loader)
+            if verbose:
+                print(
+                    f"Refitting on the full dataset ({X_full.shape[0]} samples) "
+                    f"for {best_step} optimizer steps "
+                    f"(best epoch {best_epoch} × {len(loader)} steps/epoch)."
+                )
+            self.model.load_state_dict(initial_state["model"])
+            self.head.load_state_dict(initial_state["head"])
+
+            param_groups = [
+                {"params": self.head.parameters(), "lr": learning_rate}
+            ]
+            if train_backbone:
+                param_groups.append(
+                    {
+                        "params": self.model.parameters(),
+                        "lr": backbone_lr
+                        if backbone_lr is not None
+                        else learning_rate,
+                    }
+                )
+            optimizer = torch.optim.AdamW(
+                param_groups, weight_decay=weight_decay
+            )
+
+            # Recompute "balanced" class weights over the full label set.
+            if class_weight == "balanced":
+                counts = np.bincount(
+                    y_full.numpy(), minlength=self.num_classes
+                )
+                inv = len(y_full) / (self.num_classes * np.maximum(counts, 1))
+                criterion = nn.CrossEntropyLoss(
+                    weight=torch.as_tensor(
+                        inv, dtype=torch.float32, device=self.device
+                    )
+                )
+
+            full_loader = DataLoader(
+                TensorDataset(X_full, y_full),
+                batch_size=batch_size,
+                shuffle=True,
+            )
+            step = 0
+            while step < best_step:
+                self.model.train(train_backbone)
+                self.head.train()
+                running_loss, total = 0.0, 0
+                for xb, yb in full_loader:
+                    if step >= best_step:
+                        break
+                    xb = xb.to(self.device)
+                    yb = yb.to(self.device)
+                    optimizer.zero_grad()
+                    logits = self._forward_logits(xb)
+                    loss = criterion(logits, yb)
+                    loss.backward()
+                    optimizer.step()
+                    running_loss += loss.item() * xb.size(0)
+                    total += xb.size(0)
+                    step += 1
+                if verbose and total:
+                    print(
+                        f"Refit step {step}/{best_step} - "
+                        f"loss: {running_loss / total:.4f}"
+                    )
 
         # Leave everything in eval mode for inference.
         self.model.eval()

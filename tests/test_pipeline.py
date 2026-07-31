@@ -295,3 +295,111 @@ class TestEdamamePipeline:
         assert "EdamamePipeline" in repr_str
         assert "mae" in repr_str
         assert "MaskedAutoencoder" in repr_str
+
+
+class TestFitRefitOnFullData:
+    """Test suite for `fit(..., refit_on_full_data=True)`."""
+
+    @pytest.fixture
+    def pipeline(self):
+        """Pipeline wrapping a tiny EfficientNet (UME) encoder."""
+        from edamame.model.efficientnet_contrastive import EfficientNetContrastive
+
+        torch.manual_seed(0)
+        model = EfficientNetContrastive(
+            in_channels=1,
+            seq_len=60,
+            stem_channels=4,
+            mbconv_channels=8,
+            num_mbconv_blocks=1,
+            head_channels=8,
+            embedding_dim=16,
+        )
+        return EdamamePipeline(
+            model=model,
+            model_name="efficientnet",
+            device=torch.device("cpu"),
+        )
+
+    @pytest.fixture
+    def data(self):
+        """Small, linearly separable two-class dataset."""
+        torch.manual_seed(0)
+        n = 40
+        X = torch.randn(n, 60, 1)
+        y = torch.randint(0, 2, (n,))
+        X[y == 1] += 2.0
+        return X, y.numpy()
+
+    def test_requires_early_stopping(self, pipeline, data):
+        X, y = data
+        with pytest.raises(ValueError, match="early_stopping"):
+            pipeline.fit(X, y, refit_on_full_data=True, num_epochs=1)
+
+    def test_refit_with_validation_split(self, pipeline, data, capsys):
+        X, y = data
+        pipeline.fit(
+            X,
+            y,
+            num_epochs=2,
+            batch_size=8,
+            validation_split=0.25,
+            early_stopping=True,
+            patience=5,
+            refit_on_full_data=True,
+        )
+        out = capsys.readouterr().out
+        assert "Refitting on the full dataset (40 samples)" in out
+        preds = pipeline.predict(X)
+        assert preds.shape == (40,)
+        assert set(preds.tolist()) <= {0, 1}
+
+    def test_refit_with_explicit_validation_data(self, pipeline, data, capsys):
+        X, y = data
+        pipeline.fit(
+            X[:30],
+            y[:30],
+            num_epochs=2,
+            batch_size=8,
+            validation_data=(X[30:], y[30:]),
+            early_stopping=True,
+            refit_on_full_data=True,
+        )
+        out = capsys.readouterr().out
+        # train (30) + validation (10) are concatenated for the refit
+        assert "Refitting on the full dataset (40 samples)" in out
+
+    def test_refit_step_budget_matches_best_epoch(self, pipeline, data, capsys):
+        X, y = data
+        pipeline.fit(
+            X,
+            y,
+            num_epochs=3,
+            batch_size=8,
+            validation_split=0.25,
+            early_stopping=True,
+            patience=10,
+            refit_on_full_data=True,
+        )
+        out = capsys.readouterr().out
+        # 30 training samples / batch_size 8 -> 4 steps per phase-1 epoch
+        import re
+
+        match = re.search(r"for (\d+) optimizer steps \(best epoch (\d+)", out)
+        assert match is not None
+        steps, best_epoch = int(match.group(1)), int(match.group(2))
+        assert steps == best_epoch * 4
+
+    def test_refit_rejects_unknown_validation_labels(self, pipeline, data):
+        X, y = data
+        y_val = y[30:].copy()
+        y_val[0] = 99  # label absent from the training set
+        with pytest.raises(ValueError, match="labels not present"):
+            pipeline.fit(
+                X[:30],
+                y[:30],
+                num_epochs=1,
+                validation_data=(X[30:], y_val),
+                early_stopping=True,
+                refit_on_full_data=True,
+            )

@@ -35,15 +35,19 @@ def user_session_splitting(
 
     series_indices = randperm(sum(lengths), generator=generator).tolist()  # type: ignore[arg-type, call-overload]
 
+    # A split can round down to zero recordings; it is then an empty Subset.
     return [
         Subset(
             dataset,
-            cat(
-                [
-                    
-                    dataset.series_to_idx[i]
-                    for i in series_indices[offset - length : offset]
-                ]
+            (
+                cat(
+                    [
+                        dataset.series_to_idx[i]
+                        for i in series_indices[offset - length : offset]
+                    ]
+                )
+                if length > 0
+                else []
             ),
         )
         for offset, length in zip(itertools.accumulate(lengths), lengths)

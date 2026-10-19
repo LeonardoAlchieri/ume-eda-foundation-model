@@ -30,7 +30,7 @@ model_size_presets:
     head_channels: 96
     embedding_dim: 32
     kernel_size: 5
-    dropout: 0.3
+    dropout: 0.1
   small:
     stem_channels: 48
     mbconv_channels: 48
@@ -38,15 +38,15 @@ model_size_presets:
     head_channels: 160
     embedding_dim: 48
     kernel_size: 7
-    dropout: 0.4
+    dropout: 0.1
   base:
     stem_channels: 64
     mbconv_channels: 64
     num_mbconv_blocks: 16
     head_channels: 248
     embedding_dim: 64
-    kernel_size: 9
-    dropout: 0.5
+    kernel_size: 3 # released UME
+    dropout: 0.1
   large:
     stem_channels: 96
     mbconv_channels: 96
@@ -54,7 +54,7 @@ model_size_presets:
     head_channels: 384
     embedding_dim: 96
     kernel_size: 11
-    dropout: 0.5
+    dropout: 0.1
 
 # PRETRAIN PARAMS
 pretrain:

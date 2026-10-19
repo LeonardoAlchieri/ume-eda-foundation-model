@@ -1,5 +1,8 @@
 """
 Tests for MAE reconstruction loss functions.
+
+``DefaultMAELoss.forward`` returns a tuple ``(total_loss, loss_masked, loss_visible)``
+with ``total = masked_weight * loss_masked + (1 - masked_weight) * loss_visible``.
 """
 
 import pytest
@@ -50,7 +53,7 @@ class TestDefaultMAELoss:
     
     def test_forward_basic(self, loss_fn, basic_inputs):
         """Test basic forward pass."""
-        loss = loss_fn(**basic_inputs)
+        loss, _, _ = loss_fn(**basic_inputs)
         
         # Check loss is scalar
         assert loss.dim() == 0, "Loss should be a scalar"
@@ -83,7 +86,7 @@ class TestDefaultMAELoss:
         # Add error only to masked patches
         pred[:, :5] += 1.0  # Add error to masked patches
         
-        loss = loss_fn(
+        loss, _, _ = loss_fn(
             pred=pred,
             target=target,
             mask=mask,
@@ -112,7 +115,7 @@ class TestDefaultMAELoss:
         mask = torch.zeros(batch_size, num_patches)
         mask[:, 4:] = 1.0
         
-        loss = loss_fn(
+        loss, _, _ = loss_fn(
             pred=pred,
             target=target,
             mask=mask,
@@ -138,7 +141,7 @@ class TestDefaultMAELoss:
         # No masks (all patches visible)
         mask = torch.zeros(batch_size, num_patches)
         
-        loss = loss_fn(
+        loss, _, _ = loss_fn(
             pred=pred,
             target=target,
             mask=mask,
@@ -147,10 +150,10 @@ class TestDefaultMAELoss:
             num_patches=num_patches,
         )
         
-        # Loss should be NaN or handled gracefully (division by zero)
-        # This is expected behavior - MAE requires some patches to be masked
-        assert torch.isnan(loss) or loss.item() == 0, \
-            "Loss with no masked patches should be NaN or 0"
+        # With no masked patches the masked term is 0 and, with the default
+        # masked_weight=1.0, the visible term has zero weight -> total is 0.
+        assert not torch.isnan(torch.as_tensor(loss))
+        assert float(loss) == 0, "Loss with no masked patches should be 0"
     
     def test_all_patches_masked(self, loss_fn):
         """Test behavior when all patches are masked."""
@@ -166,7 +169,7 @@ class TestDefaultMAELoss:
         # All patches masked
         mask = torch.ones(batch_size, num_patches)
         
-        loss = loss_fn(
+        loss, _, _ = loss_fn(
             pred=pred,
             target=target,
             mask=mask,
@@ -192,7 +195,7 @@ class TestDefaultMAELoss:
         mask = torch.zeros(batch_size, num_patches)
         mask[:, 5:] = 1.0
         
-        loss = loss_fn(
+        loss, _, _ = loss_fn(
             pred=pred,
             target=target,
             mask=mask,
@@ -218,7 +221,7 @@ class TestDefaultMAELoss:
         target = torch.randn(batch_size, seq_len, in_channels)
         mask = torch.ones(batch_size, num_patches) * 0.5  # 50% masked
         
-        loss = loss_fn(
+        loss, _, _ = loss_fn(
             pred=pred,
             target=target,
             mask=mask,
@@ -246,7 +249,7 @@ class TestDefaultMAELoss:
             target = torch.randn(batch_size, seq_len, in_channels)
             mask = torch.ones(batch_size, num_patches) * 0.75  # 75% masked
             
-            loss = loss_fn(
+            loss, _, _ = loss_fn(
                 pred=pred,
                 target=target,
                 mask=mask,
@@ -276,7 +279,7 @@ class TestDefaultMAELoss:
             num_masked = int(num_patches * mask_ratio)
             mask[:, :num_masked] = 1.0
             
-            loss = loss_fn(
+            loss, _, _ = loss_fn(
                 pred=pred,
                 target=target,
                 mask=mask,
@@ -288,6 +291,49 @@ class TestDefaultMAELoss:
         
         # All losses should be positive
         assert all(l > 0 for l in losses), "All losses should be positive"
+
+
+class TestDefaultMAELossComponents:
+    """Test the (total, masked, visible) decomposition and options."""
+
+    @staticmethod
+    def _inputs(in_channels=1):
+        torch.manual_seed(0)
+        batch_size, num_patches, patch_size = 3, 8, 5
+        target = torch.randn(batch_size, num_patches * patch_size, in_channels)
+        pred = target.reshape(batch_size, num_patches, patch_size * in_channels).clone()
+        mask = torch.zeros(batch_size, num_patches)
+        mask[:, :4] = 1.0
+        pred[:, :4] += 2.0  # error of 2 on masked patches
+        pred[:, 4:] += 0.5  # error of 0.5 on visible patches
+        return dict(
+            pred=pred, target=target, mask=mask, patch_size=patch_size,
+            in_channels=in_channels, num_patches=num_patches,
+        )
+
+    def test_returns_three_components(self):
+        out = DefaultMAELoss()(**self._inputs())
+        assert isinstance(out, tuple) and len(out) == 3
+
+    def test_mae_component_values(self):
+        total, masked, visible = DefaultMAELoss(loss_type="mae")(**self._inputs())
+        assert torch.isclose(masked, torch.tensor(2.0))
+        assert torch.isclose(visible, torch.tensor(0.5))
+        assert torch.isclose(total, masked)  # masked_weight=1.0 by default
+
+    def test_mse_component_values(self):
+        total, masked, visible = DefaultMAELoss(loss_type="mse")(**self._inputs(in_channels=2))
+        assert torch.isclose(masked, torch.tensor(4.0))
+        assert torch.isclose(visible, torch.tensor(0.25))
+
+    @pytest.mark.parametrize("w", [0.0, 0.3, 0.5, 1.0])
+    def test_masked_weight_combination(self, w):
+        total, masked, visible = DefaultMAELoss(masked_weight=w)(**self._inputs())
+        assert torch.isclose(total, w * masked + (1 - w) * visible)
+
+    def test_invalid_loss_type(self):
+        with pytest.raises(ValueError):
+            DefaultMAELoss(loss_type="huber")
 
 
 class TestMAELossIntegration:

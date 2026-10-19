@@ -2,6 +2,8 @@
 
 _target_: edamame.data.dataset_online.EDAtaNoLabelOnlineSegmentation
 base_path: "./data.nosync/online/"
+# The top-level configs (e.g. conf-ume.yaml) override this list with the
+# datasets actually used for pretraining.
 dataset_names: 
   - APSync
   - BiHeartS

@@ -50,7 +50,7 @@ pretrain:
     loss_fn:
       ignore_keys: true # set to false to do contrastive learning using data from the same user as positive pairs
   trainer:
-    fast_dev_run: 500
+    fast_dev_run: false # set to an int (e.g. 5) for a quick debug run
 
 # DOWNSTREAM PARAMS
 downstream:

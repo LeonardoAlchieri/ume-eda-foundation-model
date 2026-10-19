@@ -446,8 +446,21 @@ class TestTrainingValidationStepIntegration:
 # Test Epoch End Hooks
 # ============================================================================
 
+_EPOCH_END_HOOKS_DISABLED = pytest.mark.skip(
+    reason=(
+        "ContrastiveEngine.on_train_epoch_end / on_validation_epoch_end (UMAP "
+        "plotting) are intentionally commented out in edamame/engine/contrastive.py."
+    )
+)
+
+
+@_EPOCH_END_HOOKS_DISABLED
 class TestEpochEndHooks:
-    """Test on_train_epoch_end and on_validation_epoch_end hooks."""
+    """Test on_train_epoch_end and on_validation_epoch_end hooks.
+
+    Skipped while the plotting hooks are disabled; re-enable together with
+    the hooks.
+    """
     
     @patch.object(ContrastiveEngine, '_plot_embedding_visualization')
     def test_train_epoch_end_calls_plotting(self, mock_plot, contrastive_engine):
@@ -549,3 +562,21 @@ class TestEdgeCases:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+class TestScalingInEval:
+    """scaling_params must apply to every batch, not only augmented training batches."""
+
+    def test_eval_batch_is_scaled(self, mock_contrastive_model):
+        engine = ContrastiveEngine(
+            model=mock_contrastive_model,
+            seed=42,
+            scaling_params={"mean": 2.0, "std": 4.0},
+        )
+        engine.eval()
+        batch = {"x": torch.full((3, 10), 6.0), "user": torch.tensor([0, 1, 2])}
+        out = engine.on_after_batch_transfer(batch, dataloader_idx=0)
+        expected = torch.full((3, 10), 1.0)
+        assert torch.allclose(out["x"], expected)
+        assert torch.allclose(out["x_1"], expected)
+        assert torch.allclose(out["x_2"], expected)

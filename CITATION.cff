@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use UME, please cite it as below. A paper describing UME is in preparation."
+title: "UME: a foundation model for wearable electrodermal activity"
+type: software
+authors:
+  - family-names: Alchieri
+    given-names: Leonardo
+    affiliation: "Università della Svizzera italiana (USI)"
+repository-code: "https://github.com/LeonardoAlchieri/eda-foundation-models"
+version: 0.1.0
+date-released: 2026-09-29
+keywords:
+  - electrodermal activity
+  - foundation model
+  - wearables
+  - contrastive learning

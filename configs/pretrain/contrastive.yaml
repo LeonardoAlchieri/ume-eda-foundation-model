@@ -27,7 +27,9 @@ trainer:
   logger: ${pretrain.logger}
   check_val_every_n_epoch: 1
   callbacks: ${pretrain.callbacks}
-  limit_train_batches: 5000
+  # One "epoch" = 3000 randomly sampled batches (the released UME was trained this way).
+  # Set to null (or 1.0) to iterate over the full training set each epoch.
+  limit_train_batches: 3000
 
 # Override dataloader settings
 dataloader:

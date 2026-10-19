@@ -56,6 +56,7 @@ class TestContrastiveEngineAugmentation:
         """Test augmentation with 2D input (N, T) during training."""
         # Create engine
         engine = ContrastiveEngine(
+            seed=42,
             model=dummy_model,
             data_augmentation=augmentation
         )
@@ -96,6 +97,7 @@ class TestContrastiveEngineAugmentation:
         """Test augmentation with 3D input (N, T, C) during training."""
         # Create engine
         engine = ContrastiveEngine(
+            seed=42,
             model=dummy_model,
             data_augmentation=augmentation
         )
@@ -136,6 +138,7 @@ class TestContrastiveEngineAugmentation:
         """Test that augmentation is NOT applied during validation."""
         # Create engine
         engine = ContrastiveEngine(
+            seed=42,
             model=dummy_model,
             data_augmentation=augmentation
         )
@@ -162,6 +165,7 @@ class TestContrastiveEngineAugmentation:
         """Test when data_augmentation is None."""
         # Create engine without augmentation
         engine = ContrastiveEngine(
+            seed=42,
             model=dummy_model,
             data_augmentation=None
         )
@@ -184,6 +188,7 @@ class TestContrastiveEngineAugmentation:
         """Test that augmentation preserves device (CPU/GPU)."""
         # Create engine
         engine = ContrastiveEngine(
+            seed=42,
             model=dummy_model,
             data_augmentation=augmentation
         )
@@ -220,6 +225,7 @@ class TestContrastiveEngineAugmentation:
         
         # Create engine with stochastic augmentation
         engine = ContrastiveEngine(
+            seed=42,
             model=dummy_model,
             data_augmentation=StochasticAugmentation()
         )
@@ -240,6 +246,7 @@ class TestContrastiveEngineAugmentation:
         """Test that augmentation is applied independently to each sample in batch."""
         # Create engine
         engine = ContrastiveEngine(
+            seed=42,
             model=dummy_model,
             data_augmentation=augmentation
         )
@@ -279,19 +286,19 @@ class TestReconstructionEngineAugmentation:
     
     @pytest.fixture
     def augmentation(self):
-        """Create a dummy augmentation that returns a dict."""
-        class DictAugmentation:
-            def __call__(self, batch, prep_keys=None):
-                # Augmentation that adds 3.0 to the tensor
-                x = batch['x']
-                return {'x': x + 3.0}
-        
-        return DictAugmentation()
+        """Create a dummy augmentation.
+
+        ReconstructionEngine applies the augmentation per sample on NumPy
+        arrays via ``np.vectorize`` (signature ``(t)->(t)`` for 2D batches,
+        ``(t,c)->(t,c)`` for 3D batches).
+        """
+        return DummyAugmentation(offset=3.0)
     
     def test_reconstruction_augmentation_training(self, dummy_reconstruction_model, augmentation):
         """Test augmentation in ReconstructionEngine during training."""
         # Create engine
         engine = ReconstructionEngine(
+            seed=42,
             model=dummy_reconstruction_model,
             data_augmentation=augmentation
         )
@@ -311,10 +318,27 @@ class TestReconstructionEngineAugmentation:
         expected = x + 3.0
         torch.testing.assert_close(augmented_batch['x_aug'], expected)
     
+    def test_reconstruction_augmentation_3d_training(self, dummy_reconstruction_model, augmentation):
+        """Test augmentation with 3D input (N, T, C) during training."""
+        engine = ReconstructionEngine(
+            seed=42,
+            model=dummy_reconstruction_model,
+            data_augmentation=augmentation
+        )
+        engine.train()
+
+        x = torch.randn(4, 100, 3)
+        augmented_batch = engine.on_after_batch_transfer({'x': x}, dataloader_idx=0)
+
+        assert augmented_batch['x_aug'].shape == (4, 100, 3)
+        torch.testing.assert_close(augmented_batch['x_aug'], x + 3.0)
+        assert augmented_batch['batch_size'] == 4
+
     def test_reconstruction_no_augmentation_validation(self, dummy_reconstruction_model, augmentation):
         """Test that augmentation is NOT applied during validation in ReconstructionEngine."""
         # Create engine
         engine = ReconstructionEngine(
+            seed=42,
             model=dummy_reconstruction_model,
             data_augmentation=augmentation
         )

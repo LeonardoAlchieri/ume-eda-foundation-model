@@ -1,7 +1,7 @@
 """Minimal UME pipeline usage example.
 
 This script shows only the base UME inference path:
-- load UME from artifacts/ume.ckpt
+- load UME from artifacts/ume_weights.pt
 - extract embeddings from a dummy EDA batch
 """
 
@@ -19,10 +19,10 @@ def main() -> None:
     print(" UME Pipeline: Base Model Example")
     print("=" * 80 + "\n")
 
-    weights_path = Path("artifacts/ume.ckpt")
+    weights_path = Path("artifacts/ume_weights.pt")
     if not weights_path.exists():
         print(f"Error: checkpoint not found at {weights_path}")
-        print("Please place the base UME weights at artifacts/ume.ckpt.")
+        print("Please place the base UME weights at artifacts/ume_weights.pt.")
         return
 
     pipeline = EdamamePipeline.from_pretrained(

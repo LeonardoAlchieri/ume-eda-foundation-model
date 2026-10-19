@@ -6,6 +6,11 @@ This example shows how to use the pipeline with:
 2. Z-score normalization
 3. Min-max normalization
 4. Custom normalization function
+
+NOTE: this example uses a masked-autoencoder (MAE) checkpoint. We do not
+release MAE weights at this time, so it only runs with a MAE you trained
+yourself (see configs/conf-mae.yaml); set `weights_path` to your checkpoint.
+The released base UME weights are used in examples/pipeline_usage.py.
 """
 
 import torch

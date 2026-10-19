@@ -2,6 +2,8 @@
 Generic dataset class for loading multiple .npy files.
 """
 
+import math
+
 from collections.abc import Iterable
 
 import numpy as np
@@ -97,7 +99,7 @@ class EDAtaNoLabel(Dataset):
             )
 
         train_size, val_size, test_size = self.train_val_test_size
-        if train_size + val_size + test_size != 1:
+        if not math.isclose(train_size + val_size + test_size, 1.0):
             raise ValueError("train_val_test_size must sum to 1.")
 
         train_set, val_set, test_set = random_split(

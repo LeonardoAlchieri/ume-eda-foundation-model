@@ -1,4 +1,5 @@
 from logging import getLogger
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,6 @@ import torch
 from torch.utils.data import DataLoader
 
 from edamame.engine import BaseSelfSupervisedEngine
-from edamame_downstream.feature_extraction.edamame import EdamameExtractor
 from edamame.utils.logging import log_hydra_config_to_lightning
 from edamame.utils.weights import _resolve_resume_checkpoint_path
 
@@ -145,6 +145,10 @@ def downstream(
     lightning_logger: Logger,
     model_name: str,
 ) -> None:
+    # `edamame_downstream` is an optional dependency, imported lazily so that
+    # pretraining works without it.
+    from edamame_downstream.feature_extraction.edamame import EdamameExtractor
+
     experiment_results: dict[str, dict[int, dict]] = dict()
     for dataset in cfg.datasets:
         dataset: DictConfig
@@ -185,6 +189,17 @@ def main(cfg: DictConfig):
     pretrained_model, lightning_logger = pre_train(cfg=cfg.pretrain)
 
     try:
+        if not cfg.downstream.get("enabled", True):
+            logger.info("Downstream evaluation disabled (downstream.enabled=false).")
+            return
+        if importlib.util.find_spec("edamame_downstream") is None:
+            logger.warning(
+                "Skipping downstream evaluation: the optional `edamame_downstream` "
+                "package is not installed. Install it from "
+                "https://github.com/LeonardoAlchieri/pretrained_foundation_models_physiological_data "
+                "or set downstream.enabled=false to silence this warning."
+            )
+            return
         downstream(
             cfg=cfg.downstream,
             pretraine_model=pretrained_model,

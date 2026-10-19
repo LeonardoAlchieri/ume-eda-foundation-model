@@ -1,19 +1,60 @@
+---
+license: mit
+library_name: pytorch
+pipeline_tag: feature-extraction
+tags:
+  - electrodermal-activity
+  - eda
+  - wearables
+  - physiological-signals
+  - time-series
+  - contrastive-learning
+  - foundation-model
+---
+
 # 🌸 UME: Foundation Model for Electrodermal Activity (EDA) Signals
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://img.shields.io/badge/DOI-10.1145%2F3857981-blue.svg)](https://doi.org/10.1145/3857981)
+[![arXiv](https://img.shields.io/badge/arXiv-2603.16878-b31b1b.svg)](https://arxiv.org/abs/2603.16878)
 
 See also 🫛 **EDAMAME**, the large-scale EDA pretraining collection we curated to train UME: [repository](https://github.com/LeonardoAlchieri/EDAMAME) · [website](https://pc.inf.usi.ch/datasets/edamame/) (see [Pretraining data](#pretraining-data)).
+
+---
+
+<a id="quick-use"></a>
+
+## 🚀 Quick Use (UME)
+
+```bash
+pip install git+https://github.com/LeonardoAlchieri/eda-foundation-models.git
+```
+
+```python
+import torch
+from edamame import EdamamePipeline
+
+# Downloads the base UME weights from the Hugging Face Hub
+pipeline = EdamamePipeline.from_pretrained()
+
+# NOTE: default UME requires 60s windows (at 4Hz sampling rate) and 3 channels (mixed, phasic and tonic)
+x = torch.randn(8, 240, 3)  # (batch, seq_len, channels)
+embeddings = pipeline.embed(x)
+print(embeddings.shape)  # (8, 64)
+```
+
+To load from a local clone instead, pass the weights file: `EdamamePipeline.from_pretrained(weights_path="model.safetensors")` (see [Checkpoints and Weights](#checkpoints)). A runnable walkthrough is in [`notebook/pipeline_demo.ipynb`](notebook/pipeline_demo.ipynb); for other ways to install, see [Installation](#installation).
 
 ---
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [Model Card](#model-card)
 - [Installation](#installation)
-- [Quick Use](#quick-use)
 - [Fine-Tune](#fine-tune)
 - [Retrain](#retrain)
 - [Pretraining data](#pretraining-data)
@@ -32,6 +73,51 @@ See also 🫛 **EDAMAME**, the large-scale EDA pretraining collection we curated
 This repo contains the code and weights for **UME**, the first foundation model for wearable EDA data. **UME** is based on EfficientNet architecture and is trained using sample-wise contrastive learning, using the set of data augmentations from [Katie Matton](https://github.com/kmatton/contrastive-learning-for-eda).
 
 We release the weights for base UME, the default and suggested configuration, as well as other configurations (tiny, small and large). See below for more information on repo usage.
+
+---
+
+<a id="model-card"></a>
+
+## 🪪 Model Card
+
+- **What it is:** an encoder that turns 60-second windows of wrist electrodermal activity (EDA) into 64-dimensional embeddings.
+- **Architecture:** EfficientNet-style 1D CNN (stem convolution, 16 MBConv1D blocks with squeeze-and-excitation, head convolution, global average pooling, linear projection). See [`edamame/model/efficientnet_contrastive.py`](edamame/model/efficientnet_contrastive.py) and [UME Architecture](#architecture).
+- **Training objective:** sample-wise contrastive learning (InfoNCE, temperature 0.1) between two augmented views of the same window, using the EDA augmentations of [Matton et al. (2024)](https://arxiv.org/abs/2404.08783).
+- **Files:** see [Checkpoints and Weights](#checkpoints).
+- **Developed by:** Leonardo Alchieri, Università della Svizzera italiana (USI).
+- **Paper:** [doi.org/10.1145/3857981](https://doi.org/10.1145/3857981) · [arXiv:2603.16878](https://arxiv.org/abs/2603.16878)
+
+### Input
+
+- Shape `(batch, 240, 3)`: 240 samples = 60 s at 4 Hz.
+- Channels, in order: mixed EDA, phasic component, tonic component.
+- Signals at other sampling rates or window lengths should be resampled and cut to match.
+
+### Intended use
+
+- Extracting features from wearable EDA for research on downstream tasks such as stress, cognitive load, or sleep/wake classification.
+- Fine-tuning on a labelled research dataset with `EdamamePipeline.fit` (see [Fine-Tune](#fine-tune)).
+
+### Out-of-scope use
+
+- Clinical diagnosis, or any medical or safety-critical decision about an individual.
+- Inferring sensitive traits or emotional states of people without their informed consent, including workplace or surveillance monitoring.
+- Signals that are not wrist EDA (e.g. PPG, ECG) or that are sampled very differently, without first validating performance.
+
+### Training data
+
+Pretrained without labels on 17 public and research EDA datasets from the EDAMAME collection (see [Pretraining data](#pretraining-data)). The data is not distributed with the model. Recordings come mostly from research studies with wrist-worn devices such as the Empatica E4, which shapes the populations, devices and settings the model has seen.
+
+### Evaluation
+
+Downstream evaluation (frozen features and a classical classifier, validated leave-one-person-out) is run by `train.py` through the optional `edamame_downstream` package. Results are reported in the [paper](https://doi.org/10.1145/3857981).
+
+### Limitations and risks
+
+- **Population and device bias.** Performance can drop on populations, devices, body locations or recording conditions that are underrepresented in the pretraining data.
+- **Artifacts.** EDA is sensitive to motion, temperature and sensor contact. The model does not detect or flag poor-quality signal.
+- **Individual differences.** EDA varies a lot between people. Validate with person-independent splits (e.g. leave-one-person-out) rather than random splits, which overestimate performance.
+- **Privacy.** Physiological signals are personal data. Handle any data you use with the model according to its consent terms and applicable law.
 
 ---
 
@@ -74,29 +160,6 @@ Without it, `train.py` pretrains as usual and skips the downstream step with a w
 
 ---
 
-<a id="quick-use"></a>
-
-## 🚀 Quick Use (UME)
-
-We provide a simple API to use the pretrained model for inference. The weights are in [`artifacts/`](artifacts/) (see [Checkpoints and Weights](#checkpoints)). A runnable walkthrough is in [`notebook/pipeline_demo.ipynb`](notebook/pipeline_demo.ipynb).
-
-```python
-import torch
-from edamame import EdamamePipeline
-
-pipeline = EdamamePipeline.from_pretrained(
-    model_name="efficientnet",
-    weights_path="artifacts/ume_weights.pt",
-)
-
-# NOTE: default UME requires 60s windows (at 4Hz sampling rate) and 3 channels (mixed, phasic and tonic)
-x = torch.randn(8, 240, 3)  # (batch, seq_len, channels)
-embeddings = pipeline.embed(x)
-print(embeddings.shape)  # (8, embedding_dim)
-```
-
----
-
 <a id="fine-tune"></a>
 
 ## 🎓 Fine-Tune (UME)
@@ -109,10 +172,7 @@ Beyond frozen-feature extraction, the pipeline can be **supervised fine-tuned** 
 import torch
 from edamame import EdamamePipeline
 
-pipeline = EdamamePipeline.from_pretrained(
-    model_name="efficientnet",
-    weights_path="artifacts/ume_weights.pt",
-)
+pipeline = EdamamePipeline.from_pretrained()
 
 X = torch.randn(256, 240, 3)              # (n_samples, seq_len, channels)
 y = torch.randint(0, 2, (256,)).numpy()   # labels may be ints or strings
@@ -324,14 +384,23 @@ Sweeps over model size and pretraining-data size: [`sweep-ume-ablation-size.yaml
 
 ## 💾 Checkpoints and Weights
 
-Two files hold the same base UME weights:
+Three files hold the same base UME weights:
 
 | File | Contents | Use it for |
 |------|----------|------------|
-| [`artifacts/ume_weights.pt`](artifacts/ume_weights.pt) | Encoder `state_dict` and model config only. Loads with `torch.load(..., weights_only=True)`. | Inference and fine-tuning (recommended). |
-| [`artifacts/ume.ckpt`](artifacts/ume.ckpt) | Full PyTorch Lightning checkpoint, including optimizer and scheduler state. Needs `weights_only=False`. | Resuming or inspecting training. |
+| [`model.safetensors`](model.safetensors) + [`config.json`](config.json) | Encoder weights in [safetensors](https://huggingface.co/docs/safetensors) format, with the model config. Holds tensors only, so loading never runs code. This is what `from_pretrained()` downloads from the Hugging Face Hub. | Inference and fine-tuning (recommended). |
+| [`artifacts/ume_base_inference.pt`](artifacts/ume_base_inference.pt) | Encoder `state_dict` and model config in one PyTorch file. Loads with `torch.load(..., weights_only=True)`. | Same as above, without the safetensors dependency. |
+| [`artifacts/ume_base_training.ckpt`](artifacts/ume_base_training.ckpt) | Full PyTorch Lightning checkpoint, including optimizer and scheduler state. Needs `weights_only=False`. | Resuming or inspecting training. |
 
-`EdamamePipeline.from_pretrained` accepts either file. For intended use and limitations, see the [model card](MODEL_CARD.md).
+**Are they the same model?** Yes. All three hold the same 366 encoder tensors, bit-for-bit, and give identical embeddings. They differ only in what else they contain:
+
+- `ume_base_training.ckpt` is about 3× larger because it also stores the training state (mostly the Adam optimizer state, plus epoch, step, callback and hyperparameter records). Its weight keys carry a `model.` prefix, which `from_pretrained` strips.
+- `ume_base_training.ckpt` has no model config: `from_pretrained` infers the architecture from the tensor shapes and gets the same model. The other two files include the config.
+- Only `ume_base_training.ckpt` needs `weights_only=False`, which can run code stored in the file, so load it only from a source you trust.
+
+Use `ume_base_training.ckpt` only to resume pretraining. For inference and fine-tuning, use `model.safetensors` or `ume_base_inference.pt`.
+
+`EdamamePipeline.from_pretrained` accepts any of them through `weights_path`. With no `weights_path`, it downloads `model.safetensors` and `config.json` from the Hub repo given by `repo_id` (default: the released base UME); `revision` and `cache_dir` are passed to the download.
 
 ---
 
@@ -339,7 +408,7 @@ Two files hold the same base UME weights:
 
 ## 📚 Citation
 
-The UME paper is in preparation. Until it is out, please cite this repository (GitHub's "Cite this repository" button uses [`CITATION.cff`](CITATION.cff)):
+If you use UME, please cite the paper ([doi.org/10.1145/3857981](https://doi.org/10.1145/3857981), [arXiv:2603.16878](https://arxiv.org/abs/2603.16878)). You can also cite this repository (GitHub's "Cite this repository" button uses [`CITATION.cff`](CITATION.cff)):
 
 ```bibtex
 @software{ume_eda_foundation_model,

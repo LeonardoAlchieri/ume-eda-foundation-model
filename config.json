@@ -1,0 +1,13 @@
+{
+  "model_name": "efficientnet",
+  "in_channels": 3,
+  "stem_channels": 64,
+  "kernel_size": 3,
+  "head_channels": 248,
+  "embedding_dim": 64,
+  "num_mbconv_blocks": 16,
+  "mbconv_channels": 64,
+  "seq_len": 240,
+  "dropout": 0.1,
+  "stride": 2
+}

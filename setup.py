@@ -42,6 +42,8 @@ INSTALL_REQUIRES = [
     "torchmetrics",
     "packaging",
     "tables>=3.9",  # HDF5 (.h5) dataset loading
+    "safetensors>=0.4",  # model.safetensors weights
+    "huggingface_hub>=0.20",  # EdamamePipeline.from_pretrained() Hub downloads
     "imbalanced-learn>=0.14,<0.15",
 ]
 

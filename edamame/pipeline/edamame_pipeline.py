@@ -6,6 +6,7 @@ for embedding extraction and inference tasks.
 """
 
 import copy
+import json
 import pickle
 import warnings
 from pathlib import Path
@@ -18,6 +19,11 @@ from torch.utils.data import TensorDataset, DataLoader
 from omegaconf import DictConfig, OmegaConf
 import yaml
 
+# Hugging Face Hub repository holding the released base UME weights.
+DEFAULT_REPO_ID = "LeonardoAlchieri/UME"
+HUB_WEIGHTS_FILENAME = "model.safetensors"
+HUB_CONFIG_FILENAME = "config.json"
+
 
 class EdamamePipeline:
     """
@@ -27,6 +33,10 @@ class EdamamePipeline:
     and extract embeddings from input time series data.
 
     Example:
+        >>> # Base UME from the Hugging Face Hub
+        >>> pipeline = EdamamePipeline.from_pretrained()
+        >>> embeddings = pipeline.embed(batch_data)
+        >>>
         >>> # Example with default (no normalization)
         >>> pipeline = EdamamePipeline.from_pretrained(
         ...     model_name="mae",
@@ -88,20 +98,28 @@ class EdamamePipeline:
     @classmethod
     def from_pretrained(
         cls,
-        model_name: str,
-        weights_path: Union[str, Path],
+        model_name: str = "efficientnet",
+        weights_path: Optional[Union[str, Path]] = None,
         model_config: Optional[Union[str, Path, Dict, DictConfig]] = None,
         device_map: str = "auto",
         torch_dtype: Optional[torch.dtype] = None,
         normalization_fn: Optional[Callable] = None,
+        repo_id: Optional[str] = None,
+        revision: Optional[str] = None,
+        cache_dir: Optional[Union[str, Path]] = None,
     ) -> "EdamamePipeline":
         """
-        Load a pretrained model from checkpoint.
+        Load a pretrained model from a local checkpoint or the Hugging Face Hub.
+
+        With no ``weights_path``, the weights are downloaded from the Hub repo
+        ``repo_id`` (default: ``DEFAULT_REPO_ID``, the released base UME).
 
         Args:
             model_name: Name of the model architecture (e.g., "mae", "efficientnet", "mantis")
-            weights_path: Path to the checkpoint: a Lightning ``.ckpt`` or a
-                         weights-only ``.pt`` file (``state_dict`` + ``model_config``)
+            weights_path: Path to a local checkpoint: a Lightning ``.ckpt``, a
+                         weights-only ``.pt`` file (``state_dict`` + ``model_config``),
+                         or a ``.safetensors`` file (config read from a
+                         ``config.json`` next to it). If None, load from the Hub.
             model_config: Path to model config file or config dict.
                          If None, will try to extract from checkpoint.
             device_map: Device mapping strategy:
@@ -115,6 +133,10 @@ class EdamamePipeline:
                             Should accept a torch.Tensor and return a torch.Tensor.
                             If None, no normalization is applied.
                             Example: lambda x: (x - x.mean(dim=1, keepdim=True)) / (x.std(dim=1, keepdim=True) + 1e-8)
+            repo_id: Hugging Face Hub repo to download ``model.safetensors`` and
+                    ``config.json`` from. Only used when ``weights_path`` is None.
+            revision: Hub branch, tag or commit to download (default: main).
+            cache_dir: Directory for the Hub download cache.
 
         Returns:
             EdamamePipeline instance ready for inference
@@ -123,9 +145,14 @@ class EdamamePipeline:
             ValueError: If model_name is not supported
             FileNotFoundError: If weights_path or model_config path doesn't exist
         """
+        if weights_path is None:
+            weights_path = cls._download_from_hub(repo_id or DEFAULT_REPO_ID, revision, cache_dir)
+        elif repo_id is not None:
+            raise ValueError("Pass either weights_path or repo_id, not both.")
+
         # Convert paths to Path objects
         weights_path = Path(weights_path)
-        
+
         if not weights_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {weights_path}")
 
@@ -138,9 +165,11 @@ class EdamamePipeline:
         # Load checkpoint
         checkpoint = cls._load_checkpoint(weights_path, device)
 
-        # Weights-only files (e.g. artifacts/ume_weights.pt) carry their own config
+        # Weights-only files (e.g. artifacts/ume_base_inference.pt) carry their own config
         if not config_dict and isinstance(checkpoint, dict) and "model_config" in checkpoint:
             config_dict = dict(checkpoint["model_config"])
+        # config.json files on the Hub also name the architecture
+        config_dict.pop("model_name", None)
 
         # Build model based on model_name
         if model_name.lower() == "mae":
@@ -164,15 +193,52 @@ class EdamamePipeline:
         )
 
     @staticmethod
+    def _download_from_hub(
+        repo_id: str,
+        revision: Optional[str] = None,
+        cache_dir: Optional[Union[str, Path]] = None,
+    ) -> Path:
+        """
+        Download ``model.safetensors`` and ``config.json`` from a Hub repo.
+
+        Returns the local path of the weights; the config lands next to it in
+        the same snapshot directory, where ``_load_checkpoint`` picks it up.
+        """
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError as e:
+            raise ImportError(
+                "Loading from the Hugging Face Hub needs `huggingface_hub` "
+                "(pip install huggingface_hub), or pass a local weights_path."
+            ) from e
+
+        hub_kwargs = dict(repo_id=repo_id, revision=revision, cache_dir=cache_dir)
+        hf_hub_download(filename=HUB_CONFIG_FILENAME, **hub_kwargs)
+        return Path(hf_hub_download(filename=HUB_WEIGHTS_FILENAME, **hub_kwargs))
+
+    @staticmethod
     def _load_checkpoint(weights_path: Path, device: torch.device) -> Dict[str, Any]:
         """
         Load a checkpoint, preferring the safe ``weights_only=True`` mode.
 
+        ``.safetensors`` files hold tensors only and never run code; their model
+        config is read from a ``config.json`` in the same directory, if present.
         Weights-only files (a ``state_dict`` plus a plain ``model_config``) load
-        safely. Full PyTorch Lightning checkpoints (e.g. ``artifacts/ume.ckpt``)
+        safely. Full PyTorch Lightning checkpoints (e.g. ``artifacts/ume_base_training.ckpt``)
         also pickle Python objects, so they fall back to ``weights_only=False``,
         which can run arbitrary code: only do that for files you trust.
         """
+        if weights_path.suffix == ".safetensors":
+            from safetensors.torch import load_file
+
+            # Load on CPU; the pipeline moves the model to `device` afterwards.
+            checkpoint: Dict[str, Any] = {"state_dict": load_file(weights_path, device="cpu")}
+            config_path = weights_path.with_name(HUB_CONFIG_FILENAME)
+            if config_path.exists():
+                with open(config_path) as f:
+                    checkpoint["model_config"] = json.load(f)
+            return checkpoint
+
         try:
             return torch.load(weights_path, map_location=device, weights_only=True)
         except pickle.UnpicklingError:
@@ -856,7 +922,7 @@ class EdamamePipeline:
 
         Example:
             >>> pipeline = EdamamePipeline.from_pretrained(
-            ...     model_name="efficientnet", weights_path="artifacts/ume.ckpt")
+            ...     model_name="efficientnet", weights_path="artifacts/ume_base_training.ckpt")
             >>> pipeline.fit(X, y)              # y = vector of class labels
             >>> probs = pipeline.predict_proba(X)
             >>> y_pred = pipeline.predict(X)

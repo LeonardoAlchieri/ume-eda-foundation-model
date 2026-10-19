@@ -66,7 +66,7 @@ If the package is missing, `train.py` skips the downstream step with a warning. 
 ## Verify the installation
 
 ```bash
-python examples/pipeline_usage.py   # loads artifacts/ume_weights.pt and embeds a random batch
+python examples/pipeline_usage.py   # loads artifacts/ume_base_inference.pt and embeds a random batch
 python -m pytest tests/             # needs the `dev` extra with pip
 ```
 

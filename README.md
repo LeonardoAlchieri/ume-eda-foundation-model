@@ -5,7 +5,7 @@
 [![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-See also 🫛 **EDAMAME**, the large-scale EDA pretraining collection we curated to train UME (see [Pretraining data](#pretraining-data)).
+See also 🫛 **EDAMAME**, the large-scale EDA pretraining collection we curated to train UME: [repository](https://github.com/LeonardoAlchieri/EDAMAME) · [website](https://pc.inf.usi.ch/datasets/edamame/) (see [Pretraining data](#pretraining-data)).
 
 ---
 
@@ -240,11 +240,16 @@ We also provide templates for sweeps for the model and dataset size (see [sweep-
 
 ## 🫛 Pretraining data
 
-The data is **not** included in this repository. The base UME was pretrained on these datasets from the EDAMAME collection (the list in [`configs/conf-ume.yaml`](configs/conf-ume.yaml)):
+UME was pretrained on 🫛 **EDAMAME**, which we release in two versions:
+
+- **Open**: freely downloadable.
+- **Restricted**: the full collection, available after signing a data sharing agreement.
+
+See the [EDAMAME repository](https://github.com/LeonardoAlchieri/EDAMAME) for a description of the collection and the [EDAMAME website](https://pc.inf.usi.ch/datasets/edamame/) for access to both versions. The data itself is **not** included in this repository.
+
+The base UME was pretrained on these datasets from the collection (the list in [`configs/conf-ume.yaml`](configs/conf-ume.yaml)):
 
 BiHeartS, big-ideas-glycemic-wearable, Dynamics, EmpaticaE4Stress, EPM, LAUREATE, MEFAR, M2Sleep, PPG_FieldStudy, SEED, SEED-II-Lab, SEED-II-Wild, Stress Predict Dataset, ToadStool, WEEE, WESD, Workplaces.
-
-Each dataset is distributed by its original authors under its own license, so obtain it from its source.
 
 `train.py` reads the data from `pretrain.dataset.base_path` (default `data_online.nosync/`), with one folder per dataset:
 

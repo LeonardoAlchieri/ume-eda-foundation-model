@@ -1,108 +1,41 @@
-# Test Suite for SelfSupervisedEngine
+# Tests
 
-This directory contains comprehensive tests for the `SelfSupervisedEngine` PyTorch Lightning module.
+Pytest suite for the `edamame` package. All tests run on synthetic data built
+in tmp dirs: no private data (`*.nosync`), no network, no GPU required.
 
-## Running Tests
+## Running
 
-Run all tests:
 ```bash
-python -m pytest tests/
-```
+# with the pixi environment
+pixi run python -m pytest tests/
 
-Run with verbose output:
-```bash
-python -m pytest tests/ -v
-```
+# or directly with the env interpreter
+.pixi/envs/default/bin/python -m pytest tests -q -p no:cacheprovider
 
-Run specific test file:
-```bash
+# one file / class / test
 python -m pytest tests/test_engine.py
+python -m pytest tests/test_engine.py::TestContrastiveEngine
+python -m pytest tests/test_engine.py::TestContrastiveEngine::test_contrastive_training_step
 ```
 
-Run specific test class:
-```bash
-python -m pytest tests/test_engine.py::TestSelfSupervisedEngineInitialization
-```
+Pytest options live in `pyproject.toml` (`[tool.pytest.ini_options]`: `-v`,
+`--strict-markers`, `--tb=short`).
 
-Run specific test:
-```bash
-python -m pytest tests/test_engine.py::TestSelfSupervisedEngineInitialization::test_basic_initialization
-```
+## Files
 
-## Test Coverage
+| File | Covers |
+|------|--------|
+| `test_engine.py` | `BaseSelfSupervisedEngine` (via a minimal `SimpleEngine` subclass, since `forward` is abstract): init/`seed`, optimizer and scheduler config, `monitor`, metrics, train/val/test steps, NaN warning, `on_after_batch_transfer` (`batch_size`, scaling, errors). `ContrastiveEngine` (`x_1`/`x_2` views) and `ReconstructionEngine` (`x_aug`) hooks and steps. |
+| `test_data_augmentation.py` | Train-only augmentation in `ContrastiveEngine` and `ReconstructionEngine` for 2D `(N,T)` and 3D `(N,T,C)` batches. Augmentations are NumPy callables applied per sample through `np.vectorize`. |
+| `test_contrastive_embedding_collection.py` | `ContrastiveEngine` embedding collection for UMAP plots: per-user limits, sample selection, train/val storage, `plotting_kwargs` validation. |
+| `test_dataset.py` | Offline `EDAtaNoLabel`: loads `.npz` files with `values` `(N,T,C)` and `groups` `(N,)`, concatenation, channel selection and squeezing, per-dataset user encoding, shuffling, `DataLoader` use, fractional `get_splits`. |
+| `test_dataset_online_mapping.py` | `EDAtaNoLabelOnlineSegmentation` on synthetic HDF5 stores (one key per recording, a `Timestamp` column, and `metadata` attrs): window counts, `idx_to_series`/`idx_to_position`/`series_to_idx`, segment extraction, skipping short recordings, `subsample`, `user_session_splitting` without recording leakage. |
+| `test_mae_loss.py` | `DefaultMAELoss`, which returns `(total, masked, visible)`: MAE/MSE values, `masked_weight` mixing, edge cases, gradients. Also checks integration with `MaskedAutoencoder`. |
+| `test_matton_augment_torch.py` | The torch Matton augmentations: output contract, plus statistical and spectral agreement with the NumPy versions. |
+| `test_pipeline.py` | `EdamamePipeline`: `from_pretrained` (MAE, with and without config), device mapping (`auto` picks MPS, then CUDA, then CPU), `embed`/`reconstruct`, errors, and `fit(refit_on_full_data=True)`. |
 
-### `test_engine.py`
+## Skipped tests
 
-Comprehensive test suite for the `SelfSupervisedEngine` class with **22 tests** covering:
-
-#### 1. Initialization Tests (4 tests)
-- ✅ Basic initialization with minimal arguments
-- ✅ Initialization with custom optimizer
-- ✅ Initialization with scheduler
-- ✅ Initialization with metrics
-
-#### 2. Forward Pass Tests (2 tests)
-- ✅ Forward method
-- ✅ Predict method
-
-#### 3. Training Tests (4 tests)
-- ✅ Training step with `training_step` method
-- ✅ Training step with `loss` method
-- ✅ Validation step
-- ✅ Test step
-
-#### 4. Metrics Tests (2 tests)
-- ✅ Metrics update and logging
-- ✅ Engine works without metrics
-
-#### 5. Batch Processing Tests (2 tests)
-- ✅ Batch transfer hook with 'x' key
-- ✅ Batch transfer hook with other keys
-
-#### 6. Optimizer Tests (4 tests)
-- ✅ Default optimizer configuration
-- ✅ Custom optimizer configuration
-- ✅ Optimizer with scheduler
-- ✅ Optimizer with monitor metric
-
-#### 7. Error Handling Tests (2 tests)
-- ✅ Model without required methods raises error
-- ✅ NaN loss warning
-
-#### 8. Integration Tests (2 tests)
-- ✅ Full training workflow
-- ✅ Train/val/test workflow
-
-## Test Fixtures
-
-The test suite includes several mock models:
-
-- **MockModelWithTrainingStep**: Model implementing `training_step` method
-- **MockModelWithLossMethod**: Model implementing `loss` method
-- **MockModelWithMetrics**: Model with custom metric extraction via `get_predictions_for_metrics`
-
-## Test Data
-
-- **simple_batch**: Basic batch with random tensors for regression tasks
-- **classification_batch**: Batch with class labels for classification tasks
-
-## Dependencies
-
-Tests require:
-- `pytest`
-- `torch`
-- `torchmetrics`
-- `pytorch-lightning`
-
-Install with:
-```bash
-pip install pytest torch torchmetrics pytorch-lightning
-```
-
-## Test Results
-
-All 22 tests pass successfully ✅
-
-```
-====================================== 22 passed in 1.61s ======================================
-```
+- `test_contrastive_embedding_collection.py::TestEpochEndHooks` is **skipped**
+  because the UMAP epoch-end hooks in `edamame/engine/contrastive.py` are
+  commented out. Re-enable the tests together with the hooks.

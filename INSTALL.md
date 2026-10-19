@@ -1,134 +1,73 @@
 # Installation Guide
 
-## Install from Source
+Requires **Python 3.12 or newer**. Dependencies are declared in [`setup.py`](setup.py) (pip) and [`pixi.toml`](pixi.toml) (Pixi).
 
-### Option 1: Development Installation (Recommended for Contributors)
-
-Clone the repository and install in editable mode:
+## Option 1: Pixi (recommended)
 
 ```bash
+git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
+cd eda-foundation-models
+pixi install --frozen
+```
+
+This installs everything needed for inference, fine-tuning and pretraining, with `edamame` itself in editable mode. `--frozen` installs from `pixi.lock` without re-checking the optional `downstream` environment, which needs a sibling repository (see [Downstream evaluation](#downstream-evaluation-optional)).
+
+Run commands inside the environment with `pixi run`, e.g. `pixi run python train.py --config-name conf-ume`.
+
+## Option 2: pip
+
+```bash
+git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
 cd eda-foundation-models
 pip install -e .
 ```
 
-This allows you to modify the code and see changes immediately without reinstalling.
+The base install covers inference and fine-tuning with `EdamamePipeline`. Add extras as needed:
 
-### Option 2: Development with All Dependencies
+| Extra | Adds | Needed for |
+|-------|------|------------|
+| `train` | neurokit2, umap-learn, matplotlib, hydra-list-sweeper | Pretraining with `train.py` |
+| `mantis` | mantis-tsfm | The Mantis-8M backbone (`conf-mantis`) |
+| `dev` | pytest, pytest-cov, black, flake8, isort | Running the tests, contributing |
+| `notebook` | jupyter, matplotlib, ipykernel | The notebook in `notebook/` |
+| `signal`, `viz` | neurokit2 / umap-learn, matplotlib | Subsets of `train` |
+| `all` | All of the above | |
 
-Install with all optional dependencies (development tools, signal processing, notebooks):
+For example: `pip install -e ".[train,dev]"`.
 
-```bash
-pip install -e ".[all]"
-```
+### PyTorch and CUDA
 
-### Option 3: Standard Installation
-
-Install the package directly from source:
-
-```bash
-pip install .
-```
-
-## Optional Dependencies
-
-The package has several optional dependency groups:
-
-### Development Tools
-```bash
-pip install "edamame[dev]"
-```
-Includes: pytest, pytest-cov, black, flake8, isort
-
-### Signal Processing
-```bash
-pip install "edamame[signal]"
-```
-Includes: neurokit2 for advanced EDA signal processing
-
-### Jupyter Notebooks
-```bash
-pip install "edamame[notebook]"
-```
-Includes: jupyter, matplotlib, ipykernel
-
-### All Optional Dependencies
-```bash
-pip install "edamame[all]"
-```
-
-## Verify Installation
-
-After installation, verify it works:
-
-```python
-from edamame.pipeline import EdamamePipeline
-print("✓ Installation successful!")
-```
-
-Or run the quick test:
+If pip picks the wrong PyTorch build for your GPU, install PyTorch first from the [official instructions](https://pytorch.org/get-started/locally/), e.g.:
 
 ```bash
-python test_pipeline_quick.py
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121   # CUDA 12.1
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu     # CPU only
 ```
 
-## Using the Inference API
+## Downstream evaluation (optional)
 
-Once installed, you can use the EdamamePipeline API:
-
-```python
-from edamame.pipeline import EdamamePipeline
-import torch
-
-# Load a pretrained model
-pipeline = EdamamePipeline.from_pretrained(
-    model_name="mae",
-    weights_path="path/to/checkpoint.ckpt",
-    model_config="path/to/config.yaml",
-    device_map="auto",
-)
-
-# Extract embeddings
-data = torch.randn(8, 240, 1)
-embeddings = pipeline.embed(data)
-```
-
-## Training Models
-
-To train models, you'll also need the training scripts and config files:
+After pretraining, `train.py` evaluates the model on labelled downstream tasks using the separate [`edamame_downstream`](https://github.com/LeonardoAlchieri/pretrained_foundation_models_physiological_data) package. Clone it next to this repository:
 
 ```bash
-# Clone the repo
-cd eda-foundation-models
-
-# Install with dependencies
-pip install -e ".[all]"
-
-# Run training
-python train.py --config-name=example_reconstruction
+git clone https://github.com/LeonardoAlchieri/pretrained_foundation_models_physiological_data.git ../pretrained_foundation_models_physiological_data
 ```
 
-## Troubleshooting
+Then either use the Pixi `downstream` environment:
 
-### Import Error
-If you get import errors, make sure you installed the package:
 ```bash
-pip install -e .
+pixi install -e downstream
+pixi run -e downstream python train.py --config-name conf-ume
 ```
 
-### PyTorch/CUDA Issues
-Install PyTorch separately with the correct CUDA version:
-```bash
-# For CUDA 11.8
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+or install it with pip: `pip install -e ../pretrained_foundation_models_physiological_data`.
 
-# For CPU only
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-```
+If the package is missing, `train.py` skips the downstream step with a warning. Set `downstream.enabled=false` to skip it explicitly.
 
-### Missing Dependencies
-Install all optional dependencies:
+## Verify the installation
+
 ```bash
-pip install -e ".[all]"
+python examples/pipeline_usage.py   # loads artifacts/ume_weights.pt and embeds a random batch
+python -m pytest tests/             # needs the `dev` extra with pip
 ```
 
 ## Uninstall
@@ -136,9 +75,3 @@ pip install -e ".[all]"
 ```bash
 pip uninstall edamame
 ```
-
-## Requirements
-
-- Python >= 3.8
-- PyTorch >= 2.0.0
-- See `pyproject.toml` for complete dependency list

@@ -9,6 +9,11 @@ defaults:
   - label_processor: label_binarizer
   - trainable_feature_extractor: none
 
+# Downstream evaluation runs after pretraining and needs the optional
+# `edamame_downstream` package. It is skipped with a warning if that package is
+# not installed; set `downstream.enabled=false` to skip it explicitly.
+enabled: true
+
 sampling_rate: ${sampling_rate}
 device: ${accelerator}
 batch_size: ${pretrain.dataloader.batch_size}

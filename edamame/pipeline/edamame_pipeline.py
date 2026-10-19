@@ -6,6 +6,8 @@ for embedding extraction and inference tasks.
 """
 
 import copy
+import pickle
+import warnings
 from pathlib import Path
 from typing import Dict, Optional, Union, Any, Callable, Tuple, List
 import numpy as np
@@ -98,7 +100,8 @@ class EdamamePipeline:
 
         Args:
             model_name: Name of the model architecture (e.g., "mae", "efficientnet", "mantis")
-            weights_path: Path to the checkpoint file (.ckpt)
+            weights_path: Path to the checkpoint: a Lightning ``.ckpt`` or a
+                         weights-only ``.pt`` file (``state_dict`` + ``model_config``)
             model_config: Path to model config file or config dict.
                          If None, will try to extract from checkpoint.
             device_map: Device mapping strategy:
@@ -133,7 +136,11 @@ class EdamamePipeline:
         config_dict = cls._load_model_config(model_config, model_name)
 
         # Load checkpoint
-        checkpoint = torch.load(weights_path, map_location=device, weights_only=False)
+        checkpoint = cls._load_checkpoint(weights_path, device)
+
+        # Weights-only files (e.g. artifacts/ume_weights.pt) carry their own config
+        if not config_dict and isinstance(checkpoint, dict) and "model_config" in checkpoint:
+            config_dict = dict(checkpoint["model_config"])
 
         # Build model based on model_name
         if model_name.lower() == "mae":
@@ -155,6 +162,27 @@ class EdamamePipeline:
             model_config=config_dict,
             normalization_fn=normalization_fn,
         )
+
+    @staticmethod
+    def _load_checkpoint(weights_path: Path, device: torch.device) -> Dict[str, Any]:
+        """
+        Load a checkpoint, preferring the safe ``weights_only=True`` mode.
+
+        Weights-only files (a ``state_dict`` plus a plain ``model_config``) load
+        safely. Full PyTorch Lightning checkpoints (e.g. ``artifacts/ume.ckpt``)
+        also pickle Python objects, so they fall back to ``weights_only=False``,
+        which can run arbitrary code: only do that for files you trust.
+        """
+        try:
+            return torch.load(weights_path, map_location=device, weights_only=True)
+        except pickle.UnpicklingError:
+            warnings.warn(
+                f"{weights_path} is a full training checkpoint that cannot be loaded "
+                "with weights_only=True; loading it with weights_only=False. Only do "
+                "this for files you trust.",
+                stacklevel=3,
+            )
+            return torch.load(weights_path, map_location=device, weights_only=False)
 
     @staticmethod
     def _get_device(device_map: str) -> torch.device:
@@ -257,7 +285,7 @@ class EdamamePipeline:
 
         # Infer model parameters from state dict if config is empty
         if not config_dict:
-            config_dict = EdamamePipeline._infer_mae_config_from_state_dict(state_dict)
+            config_dict.update(EdamamePipeline._infer_mae_config_from_state_dict(state_dict))
 
         # Create model
         model = MaskedAutoencoder(**config_dict)
@@ -300,7 +328,7 @@ class EdamamePipeline:
 
         # Infer model parameters from state dict if config is empty
         if not config_dict:
-            config_dict = EdamamePipeline._infer_efficientnet_config_from_state_dict(state_dict)
+            config_dict.update(EdamamePipeline._infer_efficientnet_config_from_state_dict(state_dict))
 
         # Create model
         model = EfficientNetContrastive(**config_dict)
@@ -344,7 +372,7 @@ class EdamamePipeline:
 
         # Infer model parameters from state dict if config is empty
         if not config_dict:
-            config_dict = EdamamePipeline._infer_mantis_config_from_state_dict(state_dict)
+            config_dict.update(EdamamePipeline._infer_mantis_config_from_state_dict(state_dict))
 
         # Ensure loss_fn exists (required by init but not used in eval)
         if "loss_fn" not in config_dict:
@@ -520,6 +548,10 @@ class EdamamePipeline:
         # Set default values for other parameters
         config.setdefault("encoder_num_heads", 8)
         config.setdefault("decoder_num_heads", 8)
+        # MLP hidden width = embed_dim * mlp_ratio
+        mlp_key = "encoder_blocks.0.mlp.0.weight"
+        if mlp_key in state_dict and "embed_dim" in config:
+            config["mlp_ratio"] = state_dict[mlp_key].shape[0] / config["embed_dim"]
         config.setdefault("mlp_ratio", 4.0)
         config.setdefault("mask_ratio", 0.75)
         config.setdefault("dropout", 0.1)

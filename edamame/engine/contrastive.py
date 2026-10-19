@@ -90,10 +90,11 @@ class ContrastiveEngine(BaseSelfSupervisedEngine):
         Data augmentation is only applied during training.
         """
         if isinstance(batch, dict) and "x" in batch:
+            # Scale every batch (train and eval), as the other engines do
+            if self.scaling_params is not None:
+                batch["x"] = self.apply_scaling(batch["x"])
             # Apply data augmentation to create two views only during training
             if self.data_augmentation is not None and self.training:
-                if self.scaling_params is not None:
-                    batch["x"] = self.apply_scaling(batch["x"])
                 # Convert to numpy for augmentation
                 x = batch["x"]
                 x_np = x.cpu().numpy()

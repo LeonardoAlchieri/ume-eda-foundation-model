@@ -22,10 +22,10 @@ def read_long_description() -> str:
     return readme.read_text(encoding="utf-8") if readme.exists() else ""
 
 
-# Core runtime dependencies. These mirror the conda deps in pixi.toml and are
-# sufficient for the standalone pretraining / inference (EdamamePipeline) path.
-# The downstream-evaluation half additionally needs the external
-# `edamame_downstream` sibling package, which is intentionally NOT declared here.
+# Core runtime dependencies: enough for inference and fine-tuning with
+# EdamamePipeline. Pretraining with train.py also needs the `train` extra.
+# The optional downstream evaluation in train.py additionally needs the
+# `edamame_downstream` package, installed separately (see README).
 INSTALL_REQUIRES = [
     "torch>=2.0.0",
     "torchvision>=0.21.0",
@@ -37,12 +37,25 @@ INSTALL_REQUIRES = [
     "pandas<3.0",
     "scipy>=1.10",
     "tqdm>=4.60",
+    "pyyaml",
+    "scikit-learn",
+    "torchmetrics",
     "packaging",
     "tables>=3.9",  # HDF5 (.h5) dataset loading
     "imbalanced-learn>=0.14,<0.15",
 ]
 
 EXTRAS_REQUIRE = {
+    # Everything train.py needs for pretraining.
+    "train": [
+        "neurokit2>=0.2.13,<0.3",
+        "umap-learn>=0.5.11,<0.6",
+        "matplotlib",
+        "hydra-list-sweeper>=1.1.0,<2",
+    ],
+    "mantis": [
+        "mantis-tsfm>=1.0.0,<2",
+    ],
     "dev": [
         "pytest>=8.0",
         "pytest-cov",

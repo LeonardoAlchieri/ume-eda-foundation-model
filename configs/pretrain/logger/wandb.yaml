@@ -1,18 +1,16 @@
 # Weights & Biases logger configuration
+# Logs to your default W&B entity. Set `entity` to log to a team instead.
+# Use `pretrain/logger=csv` (or `none`) to train without a W&B account.
 
 _target_: pytorch_lightning.loggers.WandbLogger
-entity: "usi-mwc-lab"
+entity: null
 project: ${project_name}
+# The group identifies the experiment (its unique settings); the run name
+# carries the per-run details such as the seed.
 group: ${group_name}
 name: ${run_name}
 save_dir: ./wandb_logs.nosync
-log_model: "all"  # Enable model checkpoint logging
+log_model: "all"  # Upload model checkpoints as W&B artifacts
 reinit: finish_previous  # Force reinitialization for each run
-id: null  # Let WandB generate unique IDs
-resume: "allow"  # Never resume runs in sweep mode
-# id: null  # Let WandB generate unique IDs
-# resume: "allow"  # Never resume runs in sweep mode
-# group: ${pretrain.da}
-# config: ${pretrain...}
-
-# il group mi identifica che esperimento ho, ovvero i setting univoci, e il name contiene seed e timestamp (del computer)
+id: null  # Let W&B generate unique IDs
+resume: "allow"

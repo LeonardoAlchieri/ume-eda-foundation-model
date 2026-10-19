@@ -247,8 +247,13 @@ class TestEdamamePipeline:
             device_map="auto",
         )
         
-        # Should use GPU if available, otherwise CPU
-        expected_device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Priority: MPS (Apple Silicon) > CUDA > CPU
+        if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+            expected_device = "mps"
+        elif torch.cuda.is_available():
+            expected_device = "cuda"
+        else:
+            expected_device = "cpu"
         assert pipeline.device.type == expected_device
     
     def test_device_mapping_cpu(self, checkpoint_file, mae_config):

@@ -1,7 +1,13 @@
 """
-Tests for the SelfSupervisedEngine class.
+Tests for the self-supervised engines (BaseSelfSupervisedEngine,
+ContrastiveEngine, ReconstructionEngine).
+
+BaseSelfSupervisedEngine.forward is abstract, so generic-loop tests use a
+minimal concrete subclass (``SimpleEngine``) that forwards the whole batch
+to the model.
 """
 
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
@@ -14,34 +20,43 @@ from edamame.engine import (
     BaseSelfSupervisedEngine,
     ContrastiveEngine,
     ReconstructionEngine,
-    SelfSupervisedEngine,  # Backward compatibility alias
 )
+
+SEED = 42
+
+
+class SimpleEngine(BaseSelfSupervisedEngine):
+    """Minimal concrete engine: forwards the full batch to the model."""
+
+    def forward(self, batch):
+        return self.model(batch)
+
+
+def make_engine(cls=None, **kwargs):
+    """Build an engine with the required ``seed`` argument filled in."""
+    cls = cls or SimpleEngine
+    kwargs.setdefault("seed", SEED)
+    return cls(**kwargs)
 
 
 # ============================================================================
 # Mock Models for Testing
 # ============================================================================
 
-class MockDataAugmentation(nn.Module):
-    """Mock data augmentation pipeline."""
-    
+class MockDataAugmentation:
+    """Mock augmentation callable.
+
+    Engines apply ``data_augmentation`` to NumPy arrays via ``np.vectorize``
+    (one series at a time), so the mock takes and returns an ndarray.
+    """
+
     def __init__(self, augmentation_value=1.0):
-        super().__init__()
         self.augmentation_value = augmentation_value
-        
-    def forward(self, batch, prep_keys=None):
-        """Apply augmentation by adding a constant to specified keys."""
-        if prep_keys is None:
-            return batch
-        
-        augmented_batch = batch.copy()
-        for key in prep_keys:
-            if key in batch and isinstance(batch[key], torch.Tensor):
-                # Add noise so that multiple calls produce different results
-                noise = torch.randn_like(batch[key]) * 0.01
-                augmented_batch[key] = batch[key] + self.augmentation_value + noise
-        
-        return augmented_batch
+
+    def __call__(self, x):
+        # Add a constant plus small noise so that two calls differ
+        noise = np.random.randn(*x.shape) * 0.01
+        return x + self.augmentation_value + noise
 
 
 class MockModel(nn.Module):
@@ -99,10 +114,15 @@ class MockClassificationModel(nn.Module):
 
 @pytest.fixture
 def simple_batch():
-    """Create a simple batch for testing."""
+    """Create a simple batch for testing.
+
+    ``batch_size`` is normally stamped by ``on_after_batch_transfer``; it is
+    included here because the step methods are called directly.
+    """
     return {
         'x': torch.randn(4, 10),
-        'target': torch.randn(4, 5)
+        'target': torch.randn(4, 5),
+        'batch_size': 4,
     }
 
 
@@ -111,7 +131,8 @@ def classification_batch():
     """Create a classification batch for testing."""
     return {
         'x': torch.randn(4, 10),
-        'y': torch.randint(0, 3, (4,))
+        'y': torch.randint(0, 3, (4,)),
+        'batch_size': 4,
     }
 
 
@@ -142,9 +163,10 @@ class TestSelfSupervisedEngineInitialization:
     
     def test_basic_initialization(self, mock_model):
         """Test basic engine initialization with minimal arguments."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         
         assert engine.model is mock_model
+        assert engine.seed == SEED
         assert engine.optimizer_class == torch.optim.Adam
         assert engine.optimizer_kwargs == {}
         assert engine.scheduler_class is None
@@ -155,7 +177,7 @@ class TestSelfSupervisedEngineInitialization:
     
     def test_initialization_with_optimizer(self, mock_model):
         """Test initialization with custom optimizer."""
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             optimizer=SGD,
             optimizer_kwargs={'lr': 0.01, 'momentum': 0.9}
@@ -166,7 +188,7 @@ class TestSelfSupervisedEngineInitialization:
     
     def test_initialization_with_scheduler(self, mock_model):
         """Test initialization with scheduler."""
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             optimizer=AdamW,
             optimizer_kwargs={'lr': 1e-3},
@@ -183,7 +205,7 @@ class TestSelfSupervisedEngineInitialization:
             'accuracy': Accuracy(task='multiclass', num_classes=3)
         }
         
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_classification_model,
             metrics=metrics
         )
@@ -198,10 +220,16 @@ class TestSelfSupervisedEngineInitialization:
 
 class TestSelfSupervisedEngineForward:
     """Test forward pass methods."""
+
+    def test_base_forward_is_abstract(self, mock_model, simple_batch):
+        """BaseSelfSupervisedEngine.forward must be implemented by subclasses."""
+        engine = BaseSelfSupervisedEngine(model=mock_model, seed=SEED)
+        with pytest.raises(NotImplementedError):
+            engine.forward(simple_batch)
     
     def test_forward(self, mock_model, simple_batch):
         """Test forward method."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         output = engine.forward(simple_batch)
         
         assert 'output' in output
@@ -210,7 +238,7 @@ class TestSelfSupervisedEngineForward:
     
     def test_predict(self, mock_model, simple_batch):
         """Test predict method."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         output = engine.predict(simple_batch)
         
         assert 'output' in output
@@ -222,7 +250,7 @@ class TestSelfSupervisedEngineTraining:
     
     def test_training_step(self, mock_model, simple_batch):
         """Test training_step with model using loss method."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         loss = engine.training_step(simple_batch, batch_idx=0)
         
         assert isinstance(loss, torch.Tensor)
@@ -231,7 +259,7 @@ class TestSelfSupervisedEngineTraining:
     
     def test_validation_step(self, mock_model, simple_batch):
         """Test validation step."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         loss = engine.validation_step(simple_batch, batch_idx=0)
         
         assert isinstance(loss, torch.Tensor)
@@ -239,7 +267,7 @@ class TestSelfSupervisedEngineTraining:
     
     def test_test_step(self, mock_model, simple_batch):
         """Test test step."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         loss = engine.test_step(simple_batch, batch_idx=0)
         
         assert isinstance(loss, torch.Tensor)
@@ -255,7 +283,7 @@ class TestSelfSupervisedEngineMetrics:
             'accuracy': Accuracy(task='multiclass', num_classes=3)
         }
         
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_classification_model,
             metrics=metrics
         )
@@ -269,7 +297,7 @@ class TestSelfSupervisedEngineMetrics:
     
     def test_no_metrics(self, mock_model, simple_batch):
         """Test engine works without metrics."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         
         # Should not raise any errors
         loss = engine.training_step(simple_batch, batch_idx=0)
@@ -281,7 +309,7 @@ class TestSelfSupervisedEngineBatchProcessing:
     
     def test_on_after_batch_transfer_with_x_key(self, mock_model):
         """Test batch transfer hook adds batch_size."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         
         batch = {'x': torch.randn(8, 10)}
         processed_batch = engine.on_after_batch_transfer(batch, dataloader_idx=0)
@@ -290,19 +318,32 @@ class TestSelfSupervisedEngineBatchProcessing:
         assert processed_batch['batch_size'] == 8
     
     def test_on_after_batch_transfer_without_x_key(self, mock_model):
-        """Test batch transfer hook with different key."""
-        engine = SelfSupervisedEngine(model=mock_model)
-        
+        """Batch dicts must contain 'x'; the base hook raises otherwise."""
+        engine = make_engine(model=mock_model)
+
         batch = {'data': torch.randn(5, 10)}
-        processed_batch = engine.on_after_batch_transfer(batch, dataloader_idx=0)
-        
-        assert 'batch_size' in processed_batch
-        assert processed_batch['batch_size'] == 5
+        with pytest.raises(KeyError):
+            engine.on_after_batch_transfer(batch, dataloader_idx=0)
+
+    def test_on_after_batch_transfer_non_dict_raises(self, mock_model):
+        """Non-dict batches are rejected."""
+        engine = make_engine(model=mock_model)
+        with pytest.raises(TypeError):
+            engine.on_after_batch_transfer(torch.randn(5, 10), dataloader_idx=0)
+
+    def test_on_after_batch_transfer_applies_scaling(self, mock_model):
+        """scaling_params (mean/std) standardize batch['x']."""
+        engine = make_engine(
+            model=mock_model, scaling_params={'mean': 2.0, 'std': 4.0}
+        )
+        batch = {'x': torch.full((3, 10), 6.0)}
+        processed = engine.on_after_batch_transfer(batch, dataloader_idx=0)
+        assert torch.allclose(processed['x'], torch.ones(3, 10))
     
     def test_base_engine_no_augmentation(self, mock_model):
         """Test BaseSelfSupervisedEngine does not perform augmentation itself."""
         aug_pipeline = MockDataAugmentation(augmentation_value=2.0)
-        engine = BaseSelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             data_augmentation=aug_pipeline
         )
@@ -328,7 +369,7 @@ class TestSelfSupervisedEngineBatchProcessing:
     
     def test_no_data_augmentation(self, mock_model):
         """Test engine works without data augmentation."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         
         original_x_1 = torch.ones(4, 10)
         batch = {'x_1': original_x_1.clone(), 'x': torch.ones(4, 10)}
@@ -341,7 +382,7 @@ class TestSelfSupervisedEngineBatchProcessing:
     def test_data_augmentation_with_no_x_keys(self, mock_model):
         """Test data augmentation when no x_ keys are present."""
         aug_pipeline = MockDataAugmentation(augmentation_value=2.0)
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             data_augmentation=aug_pipeline
         )
@@ -366,7 +407,7 @@ class TestSelfSupervisedEngineOptimizers:
     
     def test_configure_optimizers_default(self, mock_model):
         """Test default optimizer configuration."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         config = engine.configure_optimizers()
         
         assert 'optimizer' in config
@@ -374,7 +415,7 @@ class TestSelfSupervisedEngineOptimizers:
     
     def test_configure_optimizers_custom(self, mock_model):
         """Test custom optimizer configuration."""
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             optimizer=SGD,
             optimizer_kwargs={'lr': 0.01, 'momentum': 0.9}
@@ -387,7 +428,7 @@ class TestSelfSupervisedEngineOptimizers:
     
     def test_configure_optimizers_with_scheduler(self, mock_model):
         """Test optimizer with scheduler configuration."""
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             optimizer=Adam,
             optimizer_kwargs={'lr': 1e-3},
@@ -402,7 +443,7 @@ class TestSelfSupervisedEngineOptimizers:
     
     def test_configure_optimizers_with_monitor(self, mock_model):
         """Test optimizer with scheduler and monitor metric."""
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             optimizer=Adam,
             optimizer_kwargs={'lr': 1e-3},
@@ -433,7 +474,7 @@ class TestSelfSupervisedEngineErrorHandling:
                 return torch.tensor(float('nan'))
         
         model = ModelWithNaNLoss()
-        engine = SelfSupervisedEngine(model=model)
+        engine = make_engine(model=model)
         
         # Training step should still run but print warning
         loss = engine.training_step(simple_batch, batch_idx=5)
@@ -448,7 +489,7 @@ class TestSelfSupervisedEngineIntegration:
     
     def test_full_training_workflow(self, mock_model):
         """Test a complete mini training workflow."""
-        engine = SelfSupervisedEngine(
+        engine = make_engine(
             model=mock_model,
             optimizer=Adam,
             optimizer_kwargs={'lr': 1e-3}
@@ -456,7 +497,7 @@ class TestSelfSupervisedEngineIntegration:
         
         # Create multiple batches
         batches = [
-            {'x': torch.randn(4, 10), 'target': torch.randn(4, 5)}
+            {'x': torch.randn(4, 10), 'target': torch.randn(4, 5), 'batch_size': 4}
             for _ in range(3)
         ]
         
@@ -471,9 +512,9 @@ class TestSelfSupervisedEngineIntegration:
     
     def test_train_val_test_workflow(self, mock_model):
         """Test train/val/test workflow."""
-        engine = SelfSupervisedEngine(model=mock_model)
+        engine = make_engine(model=mock_model)
         
-        batch = {'x': torch.randn(4, 10), 'target': torch.randn(4, 5)}
+        batch = {'x': torch.randn(4, 10), 'target': torch.randn(4, 5), 'batch_size': 4}
         
         # All steps should work
         train_loss = engine.training_step(batch, batch_idx=0)
@@ -494,11 +535,11 @@ class TestContrastiveEngine:
                 super().__init__()
                 self.net = nn.Linear(10, 5)
             
-            def forward(self, batch):
-                # Contrastive model expects x_1 and x_2
+            def forward(self, x_1, x_2):
+                # ContrastiveEngine calls model(x_1, x_2)
                 return {
-                    'z1': self.net(batch['x_1']),
-                    'z2': self.net(batch['x_2'])
+                    'z1': self.net(x_1),
+                    'z2': self.net(x_2)
                 }
             
             def loss(self, output, batch, step='train'):
@@ -506,7 +547,8 @@ class TestContrastiveEngine:
                 return torch.mean((output['z1'] - output['z2']) ** 2)
         
         model = MockContrastiveModel()
-        engine = ContrastiveEngine(
+        engine = make_engine(
+            ContrastiveEngine,
             model=model,
             data_augmentation=mock_data_augmentation
         )
@@ -534,17 +576,18 @@ class TestContrastiveEngine:
                 super().__init__()
                 self.net = nn.Linear(10, 5)
             
-            def forward(self, batch):
+            def forward(self, x_1, x_2):
+                # ContrastiveEngine calls model(x_1, x_2)
                 return {
-                    'z1': self.net(batch['x_1']),
-                    'z2': self.net(batch['x_2'])
+                    'z1': self.net(x_1),
+                    'z2': self.net(x_2)
                 }
             
             def loss(self, output, batch, step='train'):
                 return torch.mean((output['z1'] - output['z2']) ** 2)
         
         model = MockContrastiveModel()
-        engine = ContrastiveEngine(model=model, data_augmentation=None)
+        engine = make_engine(ContrastiveEngine, model=model, data_augmentation=None)
         
         batch = {'x': torch.randn(4, 10)}
         original_x = batch['x'].clone()
@@ -564,17 +607,19 @@ class TestContrastiveEngine:
                 super().__init__()
                 self.net = nn.Linear(10, 5)
             
-            def forward(self, batch):
+            def forward(self, x_1, x_2):
+                # ContrastiveEngine calls model(x_1, x_2)
                 return {
-                    'z1': self.net(batch['x_1']),
-                    'z2': self.net(batch['x_2'])
+                    'z1': self.net(x_1),
+                    'z2': self.net(x_2)
                 }
             
             def loss(self, output, batch, step='train'):
                 return torch.mean((output['z1'] - output['z2']) ** 2)
         
         model = MockContrastiveModel()
-        engine = ContrastiveEngine(
+        engine = make_engine(
+            ContrastiveEngine,
             model=model,
             data_augmentation=mock_data_augmentation
         )
@@ -601,9 +646,9 @@ class TestReconstructionEngine:
                 self.encoder = nn.Linear(10, 5)
                 self.decoder = nn.Linear(5, 10)
             
-            def forward(self, batch):
-                # Reconstruction model expects x_aug
-                z = self.encoder(batch['x_aug'])
+            def forward(self, x_aug):
+                # ReconstructionEngine calls model(x_aug)
+                z = self.encoder(x_aug)
                 x_recon = self.decoder(z)
                 return {'x_recon': x_recon}
             
@@ -612,7 +657,8 @@ class TestReconstructionEngine:
                 return torch.mean((output['x_recon'] - batch['x']) ** 2)
         
         model = MockReconstructionModel()
-        engine = ReconstructionEngine(
+        engine = make_engine(
+            ReconstructionEngine,
             model=model,
             data_augmentation=mock_data_augmentation
         )
@@ -640,8 +686,9 @@ class TestReconstructionEngine:
                 self.encoder = nn.Linear(10, 5)
                 self.decoder = nn.Linear(5, 10)
             
-            def forward(self, batch):
-                z = self.encoder(batch['x_aug'])
+            def forward(self, x_aug):
+                # ReconstructionEngine calls model(x_aug)
+                z = self.encoder(x_aug)
                 x_recon = self.decoder(z)
                 return {'x_recon': x_recon}
             
@@ -649,7 +696,7 @@ class TestReconstructionEngine:
                 return torch.mean((output['x_recon'] - batch['x']) ** 2)
         
         model = MockReconstructionModel()
-        engine = ReconstructionEngine(model=model, data_augmentation=None)
+        engine = make_engine(ReconstructionEngine, model=model, data_augmentation=None)
         
         batch = {'x': torch.randn(4, 10)}
         original_x = batch['x'].clone()
@@ -668,8 +715,9 @@ class TestReconstructionEngine:
                 self.encoder = nn.Linear(10, 5)
                 self.decoder = nn.Linear(5, 10)
             
-            def forward(self, batch):
-                z = self.encoder(batch['x_aug'])
+            def forward(self, x_aug):
+                # ReconstructionEngine calls model(x_aug)
+                z = self.encoder(x_aug)
                 x_recon = self.decoder(z)
                 return {'x_recon': x_recon}
             
@@ -677,7 +725,8 @@ class TestReconstructionEngine:
                 return torch.mean((output['x_recon'] - batch['x']) ** 2)
         
         model = MockReconstructionModel()
-        engine = ReconstructionEngine(
+        engine = make_engine(
+            ReconstructionEngine,
             model=model,
             data_augmentation=mock_data_augmentation
         )
@@ -689,29 +738,6 @@ class TestReconstructionEngine:
         
         assert isinstance(loss, torch.Tensor)
         assert loss.ndim == 0  # Scalar
-        assert not torch.isnan(loss)
-
-
-class TestEngineBackwardCompatibility:
-    """Test backward compatibility with SelfSupervisedEngine alias."""
-    
-    def test_self_supervised_engine_is_base(self, mock_model):
-        """Test that SelfSupervisedEngine is an alias for BaseSelfSupervisedEngine."""
-        engine = SelfSupervisedEngine(model=mock_model)
-        assert isinstance(engine, BaseSelfSupervisedEngine)
-    
-    def test_self_supervised_engine_basic_functionality(self, mock_model):
-        """Test that SelfSupervisedEngine works as before."""
-        engine = SelfSupervisedEngine(
-            model=mock_model,
-            optimizer=Adam,
-            optimizer_kwargs={'lr': 1e-3}
-        )
-        
-        batch = {'x': torch.randn(4, 10), 'target': torch.randn(4, 5)}
-        loss = engine.training_step(batch, batch_idx=0)
-        
-        assert isinstance(loss, torch.Tensor)
         assert not torch.isnan(loss)
 
 

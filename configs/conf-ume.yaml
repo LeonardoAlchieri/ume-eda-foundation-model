@@ -44,7 +44,7 @@ model_size_presets:
     num_mbconv_blocks: 16
     head_channels: 248
     embedding_dim: 64
-    kernel_size: 9
+    kernel_size: 3 # released UME
     dropout: 0.1
   large:
     stem_channels: 96
@@ -95,7 +95,7 @@ pretrain:
     loss_fn:
       ignore_keys: true # set to false to do contrastive learning using data from the same user as positive pairs
   trainer:
-    fast_dev_run: 500 # !!!!!!!!!!!! SET TO FALSE FOR PRODUCTION !!!!!!!!!!!!
+    fast_dev_run: false # set to an int (e.g. 5) for a quick debug run
 
 # DOWNSTREAM PARAMS -> these are used after pretraining the model. 
 # At the end of the pretrain run, we run a couple of downstream tasks to evaluate the quality of the learned representations. 

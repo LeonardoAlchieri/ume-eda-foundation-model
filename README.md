@@ -1,32 +1,31 @@
 # 🌸 UME: Foundation Model for Electrodermal Activity (EDA) Signals
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-See also [🫛 EDAMAME](), the large-scale pretrain EDA dataset we have curated to train UME.
+See also 🫛 **EDAMAME**, the large-scale EDA pretraining collection we curated to train UME (see [Pretraining data](#pretraining-data)).
 
 ---
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
-- [Model Status](#model-status)
 - [Installation](#installation)
-- [Quick Start (UME)](#quick-start-ume)
-- [Fine-Tune (UME)](#-fine-tune-ume)
-- [UME Architecture (Base)](#ume-architecture-base)
-- [Released UME Configurations](#released-ume-configurations)
-- [EDAMAME Pretrain-Size Ablations](#edamame-pretrain-size-ablations)
-- [Checkpoints and Weights](#checkpoints-and-weights)
-- [Inference API (UME)](#inference-api-ume)
-- [Repository Structure](#repository-structure)
-- [Configuration Notes](#configuration-notes)
+- [Quick Use](#quick-use)
+- [Fine-Tune](#fine-tune)
+- [Retrain](#retrain)
+- [Pretraining data](#pretraining-data)
+- [UME Architecture (Base)](#architecture)
+- [UME Configurations](#configurations)
+- [Checkpoints and Weights](#checkpoints)
 - [Citation](#citation)
 - [License](#license)
 
 ---
+
+<a id="overview"></a>
 
 ## 🎯 Overview
 
@@ -36,25 +35,50 @@ We release the weights for base UME, the default and suggested configuration, as
 
 ---
 
+<a id="installation"></a>
+
 ## 🔧 Installation
 
-### Pixi Setup (Recommended)
+### Pixi (recommended)
 
-This repository is configured with Pixi using [`pixi.toml`](pixi.toml)
+The environment is defined in [`pixi.toml`](pixi.toml). Install [Pixi](https://pixi.sh), then:
 
 ```bash
-# Install Pixi first (https://pixi.sh), then clone and enter repo
+git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
 cd eda-foundation-models
-
-# Resolve and install environment from pixi.toml
-pixi install
+pixi install --frozen
 ```
+
+`--frozen` installs the default environment straight from `pixi.lock`. Without it, Pixi also checks the optional `downstream` environment, which needs the sibling repository described below.
+
+### pip
+
+```bash
+pip install -e .            # inference and fine-tuning (EdamamePipeline)
+pip install -e ".[train]"   # + everything train.py needs for pretraining
+```
+
+Other extras: `mantis` (Mantis-8M backbone), `dev` (pytest, black, flake8, isort), `notebook`. See [INSTALL.md](INSTALL.md).
+
+### Optional: downstream evaluation
+
+After pretraining, `train.py` can evaluate the new model on labelled downstream tasks. This needs the separate [`edamame_downstream`](https://github.com/LeonardoAlchieri/pretrained_foundation_models_physiological_data) package, cloned next to this repository:
+
+```bash
+git clone https://github.com/LeonardoAlchieri/pretrained_foundation_models_physiological_data.git ../pretrained_foundation_models_physiological_data
+pixi install -e downstream
+pixi run -e downstream python train.py --config-name conf-ume
+```
+
+Without it, `train.py` pretrains as usual and skips the downstream step with a warning. Set `downstream.enabled=false` to skip it explicitly.
 
 ---
 
+<a id="quick-use"></a>
+
 ## 🚀 Quick Use (UME)
 
-We provide a simple API to use the pre-trained model for inference. The weights are provided inside `artifacts`.
+We provide a simple API to use the pretrained model for inference. The weights are in [`artifacts/`](artifacts/) (see [Checkpoints and Weights](#checkpoints)). A runnable walkthrough is in [`notebook/pipeline_demo.ipynb`](notebook/pipeline_demo.ipynb).
 
 ```python
 import torch
@@ -62,7 +86,7 @@ from edamame import EdamamePipeline
 
 pipeline = EdamamePipeline.from_pretrained(
     model_name="efficientnet",
-    weights_path="artifacts/ume.ckpt",
+    weights_path="artifacts/ume_weights.pt",
 )
 
 # NOTE: default UME requires 60s windows (at 4Hz sampling rate) and 3 channels (mixed, phasic and tonic)
@@ -72,6 +96,8 @@ print(embeddings.shape)  # (8, embedding_dim)
 ```
 
 ---
+
+<a id="fine-tune"></a>
 
 ## 🎓 Fine-Tune (UME)
 
@@ -85,7 +111,7 @@ from edamame import EdamamePipeline
 
 pipeline = EdamamePipeline.from_pretrained(
     model_name="efficientnet",
-    weights_path="artifacts/ume.ckpt",
+    weights_path="artifacts/ume_weights.pt",
 )
 
 X = torch.randn(256, 240, 3)              # (n_samples, seq_len, channels)
@@ -166,9 +192,17 @@ The refit model cannot be validated internally, so use an outer evaluation loop 
 
 ---
 
+<a id="retrain"></a>
+
 ## 🏋️ Retrain (UME)
 
-We provide config files with Hydra to reproduce the experiments from our work. Modify the config files to try different configurations.
+We provide Hydra config files to reproduce the experiments from our work. Modify them to try different configurations. Retraining needs the pretraining data, which is not included in this repository (see [Pretraining data](#pretraining-data)).
+
+Notes on the defaults:
+
+- **Logging.** Runs log to [Weights & Biases](https://wandb.ai) under your default entity. Add `pretrain/logger=csv` (or `tensorboard`, `none`) to train without a W&B account.
+- **Epoch length.** An "epoch" is 3000 randomly sampled batches of 256 windows (`pretrain.trainer.limit_train_batches`), as for the released model. Set it to `null` to use the full training set per epoch.
+- **Quick check.** Add `pretrain.trainer.fast_dev_run=5` to run a few batches end to end.
 
 ### 1. Train base UME
 
@@ -182,7 +216,7 @@ pixi run python train.py --config-name conf-ume
 # Base (default)
 python train.py --config-name conf-ume model_size=base
 
-# Other released presets
+# Other presets
 python train.py --config-name conf-ume model_size=tiny
 python train.py --config-name conf-ume model_size=small
 python train.py --config-name conf-ume model_size=large
@@ -192,7 +226,7 @@ python train.py --config-name conf-ume model_size=large
 # Base (default)
 python train.py --config-name conf-ume pretrain.dataset.subsample=1.0
 
-# Other released presets
+# Other presets
 python train.py --config-name conf-ume pretrain.dataset.subsample=0.05
 python train.py --config-name conf-ume pretrain.dataset.subsample=0.5
 python train.py --config-name conf-ume pretrain.dataset.subsample=0.75
@@ -201,6 +235,30 @@ python train.py --config-name conf-ume pretrain.dataset.subsample=0.75
 We also provide templates for sweeps for the model and dataset size (see [sweep-ume-ablation-size.yaml](configs/sweep-ume-ablation-size.yaml) and [sweep-ume-ablation-subsample.yaml](configs/sweep-ume-ablation-subsample.yaml)).
 
 ---
+
+<a id="pretraining-data"></a>
+
+## 🫛 Pretraining data
+
+The data is **not** included in this repository. The base UME was pretrained on these datasets from the EDAMAME collection (the list in [`configs/conf-ume.yaml`](configs/conf-ume.yaml)):
+
+BiHeartS, big-ideas-glycemic-wearable, Dynamics, EmpaticaE4Stress, EPM, LAUREATE, MEFAR, M2Sleep, PPG_FieldStudy, SEED, SEED-II-Lab, SEED-II-Wild, Stress Predict Dataset, ToadStool, WEEE, WESD, Workplaces.
+
+Each dataset is distributed by its original authors under its own license, so obtain it from its source.
+
+`train.py` reads the data from `pretrain.dataset.base_path` (default `data_online.nosync/`), with one folder per dataset:
+
+```
+data_online.nosync/
+└── <dataset_name>/
+    └── *.h5          # one or more pandas HDFStore files
+```
+
+Each key in an HDF5 store is one recording, stored as a pandas DataFrame with the EDA channels as columns (mixed, phasic, tonic, sampled at 4 Hz). An optional `Timestamp` column is dropped. Each key's storer has an `attrs.metadata` dict with `user`, `session`, `dataset_name` and `len_data` (number of samples). The loader cuts 60 s windows (240 samples) on the fly with a stride of `shift` samples, and splits train and validation by recording, so windows from one recording never end up in both.
+
+---
+
+<a id="architecture"></a>
 
 ## 🏗️ UME Architecture (Base)
 
@@ -215,7 +273,7 @@ Input (N, T, C)
   -> Contrastive loss on two augmented views
 ```
 
-Base preset (default) from [`configs/pretrain/model/efficientnet_contrastive.yaml`](configs/pretrain/model/efficientnet_contrastive.yaml):
+Base preset (default), set through the `model_size` presets in [`configs/conf-ume.yaml`](configs/conf-ume.yaml):
 
 | Parameter | Base Value |
 |-----------|------------|
@@ -224,9 +282,10 @@ Base preset (default) from [`configs/pretrain/model/efficientnet_contrastive.yam
 | `num_mbconv_blocks` | `16` |
 | `head_channels` | `248` |
 | `embedding_dim` | `64` |
-| `kernel_size` | `9` |
-| `dropout` | `0.5` |
+| `kernel_size` | `3` |
+| `dropout` | `0.1` |
 | `loss temperature` | `0.1` |
+| optimizer | Adam, lr `5e-4`, weight decay `1e-3` |
 
 Contrastive training setup (augmentations, optimizer, scheduler):
 
@@ -235,9 +294,11 @@ Contrastive training setup (augmentations, optimizer, scheduler):
 
 ---
 
-## 🧪 Released UME Configurations
+<a id="configurations"></a>
 
-We focus on the **base UME** preset in practice, but we release additional UME configurations for transparency and reproducibility.
+## 🧪 UME Configurations
+
+We recommend the **base UME** preset, and only its weights are released. The other presets and the pretraining-data subsamples used in our ablations can be retrained with the configs below.
 
 ### UME model-size presets
 
@@ -245,31 +306,46 @@ Defined in [`configs/conf-ume.yaml`](configs/conf-ume.yaml):
 
 | Preset | Stem | MBConv | Blocks | Head | Embedding | Kernel | Dropout |
 |--------|------|--------|--------|------|-----------|--------|---------|
-| `tiny` | `32` | `32` | `4`  | `96`  | `32` | `5`  | `0.3` |
-| `small`| `48` | `48` | `8`  | `160` | `48` | `7`  | `0.4` |
-| `base` | `64` | `64` | `16` | `248` | `64` | `9`  | `0.5` |
-| `large`| `96` | `96` | `24` | `384` | `96` | `11` | `0.5` |
+| `tiny` | `32` | `32` | `4`  | `96`  | `32` | `5`  | `0.1` |
+| `small`| `48` | `48` | `8`  | `160` | `48` | `7`  | `0.1` |
+| `base` | `64` | `64` | `16` | `248` | `64` | `3`  | `0.1` |
+| `large`| `96` | `96` | `24` | `384` | `96` | `11` | `0.1` |
+
+Sweeps over model size and pretraining-data size: [`sweep-ume-ablation-size.yaml`](configs/sweep-ume-ablation-size.yaml) and [`sweep-ume-ablation-subsample.yaml`](configs/sweep-ume-ablation-subsample.yaml).
 
 ---
 
-> **Open science note**
-> We release ablation checkpoints for transparency and reproducibility. These subsample/ablation weights are **not** our recommended default for downstream use. Prefer the base UME checkpoint unless you are explicitly reproducing ablation analyses.
-
----
+<a id="checkpoints"></a>
 
 ## 💾 Checkpoints and Weights
 
-Examples of released weights in this repository:
+Two files hold the same base UME weights:
 
-- Main artifact: [`artifacts/ume.ckpt`](artifacts/ume.ckpt)
+| File | Contents | Use it for |
+|------|----------|------------|
+| [`artifacts/ume_weights.pt`](artifacts/ume_weights.pt) | Encoder `state_dict` and model config only. Loads with `torch.load(..., weights_only=True)`. | Inference and fine-tuning (recommended). |
+| [`artifacts/ume.ckpt`](artifacts/ume.ckpt) | Full PyTorch Lightning checkpoint, including optimizer and scheduler state. Needs `weights_only=False`. | Resuming or inspecting training. |
+
+`EdamamePipeline.from_pretrained` accepts either file. For intended use and limitations, see the [model card](MODEL_CARD.md).
 
 ---
 
-<!-- ## 📚 Citation
+<a id="citation"></a>
 
-If you use this code in your research, please cite your corresponding EDAMAME/UME paper and repository.
+## 📚 Citation
 
-You may also cite related augmentation work used in the training setup:
+The UME paper is in preparation. Until it is out, please cite this repository (GitHub's "Cite this repository" button uses [`CITATION.cff`](CITATION.cff)):
+
+```bibtex
+@software{ume_eda_foundation_model,
+  title  = {{UME}: a foundation model for wearable electrodermal activity},
+  author = {Alchieri, Leonardo},
+  year   = {2026},
+  url    = {https://github.com/LeonardoAlchieri/eda-foundation-models}
+}
+```
+
+The data augmentations used for contrastive pretraining come from:
 
 ```bibtex
 @article{matton2024contrastive,
@@ -278,9 +354,11 @@ You may also cite related augmentation work used in the training setup:
   journal={arXiv preprint arXiv:2404.08783},
   year={2024}
 }
-``` -->
+```
 
 ---
+
+<a id="license"></a>
 
 ## 📄 License
 
@@ -288,6 +366,6 @@ This project is licensed under the MIT License. See [`LICENSE`](LICENSE).
 
 ---
 
-<!-- <p align="center">
+<p align="center">
   <i>People Centered Computing Lab @ USI, Switzerland.</i>
-</p> -->
+</p>

@@ -26,11 +26,11 @@ The base install covers inference and fine-tuning with `UMEPipeline`. Add extras
 
 | Extra | Adds | Needed for |
 |-------|------|------------|
-| `train` | neurokit2, umap-learn, matplotlib, hydra-list-sweeper | Pretraining with `train.py` |
+| `train` | neurokit2, umap-learn, hydra-list-sweeper | Pretraining with `train.py` |
 | `mantis` | mantis-tsfm | The Mantis-8M backbone (`conf-mantis`) |
 | `dev` | pytest, pytest-cov, black, flake8, isort | Running the tests, contributing |
-| `notebook` | jupyter, matplotlib, ipykernel | The notebook in `notebook/` |
-| `signal`, `viz` | neurokit2 / umap-learn, matplotlib | Subsets of `train` |
+| `notebook` | jupyter, ipykernel | The notebook in `notebook/` |
+| `signal`, `viz` | neurokit2 / umap-learn | Subsets of `train` |
 | `all` | All of the above | |
 
 For example: `pip install -e ".[train,dev]"`.

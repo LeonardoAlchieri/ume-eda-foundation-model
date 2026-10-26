@@ -45,6 +45,7 @@ INSTALL_REQUIRES = [
     "safetensors>=0.4",  # model.safetensors weights
     "huggingface_hub>=0.20",  # UMEPipeline.from_pretrained() Hub downloads
     "imbalanced-learn>=0.14,<0.15",
+    "matplotlib>=3.7",  # imported by ume.model / ume.engine (plots)
 ]
 
 EXTRAS_REQUIRE = {
@@ -52,7 +53,6 @@ EXTRAS_REQUIRE = {
     "train": [
         "neurokit2>=0.2.13,<0.3",
         "umap-learn>=0.5.11,<0.6",
-        "matplotlib",
         "hydra-list-sweeper>=1.1.0,<2",
     ],
     "mantis": [
@@ -71,12 +71,10 @@ EXTRAS_REQUIRE = {
     "notebook": [
         "jupyter",
         "notebook>=7.0",
-        "matplotlib",
         "ipykernel",
     ],
     "viz": [
         "umap-learn>=0.5.11,<0.6",
-        "matplotlib",
     ],
 }
 # `all` = union of every optional group.

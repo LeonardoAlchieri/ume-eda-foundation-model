@@ -1,16 +1,47 @@
 cff-version: 1.2.0
-message: "If you use UME, please cite it as below. A paper describing UME is in preparation."
-title: "UME: a foundation model for wearable electrodermal activity"
-type: software
+message: "If you use UME, please cite the paper below."
+title: "A Foundation Model for Electrodermal Activity Data"
 authors:
   - family-names: Alchieri
     given-names: Leonardo
-    affiliation: "Università della Svizzera italiana (USI)"
-repository-code: "https://github.com/LeonardoAlchieri/eda-foundation-models"
-version: 0.1.0
-date-released: 2026-09-29
-keywords:
-  - electrodermal activity
-  - foundation model
-  - wearables
-  - contrastive learning
+  - family-names: Garzon
+    given-names: Matteo
+  - family-names: Alecci
+    given-names: Lidia
+  - family-names: Bombassei De Bona
+    given-names: Francesco
+  - family-names: Gjoreski
+    given-names: Martin
+  - family-names: De Felice
+    given-names: Giovanni
+  - family-names: Santini
+    given-names: Silvia
+doi: "10.1145/3857981"
+preferred-citation:
+  type: article
+  title: "A Foundation Model for Electrodermal Activity Data"
+  authors:
+    - family-names: Alchieri
+      given-names: Leonardo
+    - family-names: Garzon
+      given-names: Matteo
+    - family-names: Alecci
+      given-names: Lidia
+    - family-names: Bombassei De Bona
+      given-names: Francesco
+    - family-names: Gjoreski
+      given-names: Martin
+    - family-names: De Felice
+      given-names: Giovanni
+    - family-names: Santini
+      given-names: Silvia
+  journal: "Proceedings of the ACM on Interactive, Mobile, Wearable and Ubiquitous Technologies"
+  volume: 10
+  issue: 4
+  start: 202
+  year: 2026
+  month: 12
+  publisher:
+    name: "Association for Computing Machinery"
+  doi: "10.1145/3857981"
+  url: "https://doi.org/10.1145/3857981"

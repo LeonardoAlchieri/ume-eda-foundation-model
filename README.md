@@ -408,25 +408,23 @@ Use `ume_base_training.ckpt` only to resume pretraining. For inference and fine-
 
 ## 📚 Citation
 
-If you use UME, please cite the paper ([doi.org/10.1145/3857981](https://doi.org/10.1145/3857981), [arXiv:2603.16878](https://arxiv.org/abs/2603.16878)). You can also cite this repository (GitHub's "Cite this repository" button uses [`CITATION.cff`](CITATION.cff)):
+If you use UME, please cite the paper ([doi.org/10.1145/3857981](https://doi.org/10.1145/3857981)):
 
 ```bibtex
-@software{ume_eda_foundation_model,
-  title  = {{UME}: a foundation model for wearable electrodermal activity},
-  author = {Alchieri, Leonardo},
-  year   = {2026},
-  url    = {https://github.com/LeonardoAlchieri/eda-foundation-models}
-}
-```
-
-The data augmentations used for contrastive pretraining come from:
-
-```bibtex
-@article{matton2024contrastive,
-  title={Contrastive Learning of Electrodermal Activity Representations for Stress Detection},
-  author={Matton, Katie and Lewis, Robert and Guttag, John and Picard, Rosalind},
-  journal={arXiv preprint arXiv:2404.08783},
-  year={2024}
+@article{alchieri2026foundation,
+  author     = {Alchieri, Leonardo and Garzon, Matteo and Alecci, Lidia and Bombassei De Bona, Francesco and Gjoreski, Martin and De Felice, Giovanni and Santini, Silvia},
+  title      = {A Foundation Model for Electrodermal Activity Data},
+  journal    = {Proc. ACM Interact. Mob. Wearable Ubiquitous Technol.},
+  volume     = {10},
+  number     = {4},
+  articleno  = {202},
+  numpages   = {40},
+  year       = {2026},
+  month      = dec,
+  publisher  = {Association for Computing Machinery},
+  address    = {New York, NY, USA},
+  doi        = {10.1145/3857981},
+  url        = {https://doi.org/10.1145/3857981}
 }
 ```
 

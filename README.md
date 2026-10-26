@@ -82,7 +82,7 @@ We release the weights for base UME, the default and suggested configuration, as
 
 - **What it is:** an encoder that turns 60-second windows of wrist electrodermal activity (EDA) into 64-dimensional embeddings.
 - **Architecture:** EfficientNet-style 1D CNN (stem convolution, 16 MBConv1D blocks with squeeze-and-excitation, head convolution, global average pooling, linear projection). See [`ume/model/efficientnet_contrastive.py`](ume/model/efficientnet_contrastive.py) and [UME Architecture](#architecture).
-- **Training objective:** sample-wise contrastive learning (InfoNCE, temperature 0.1) between two augmented views of the same window, using the EDA augmentations of [Matton et al. (2024)](https://arxiv.org/abs/2404.08783).
+- **Training objective:** sample-wise contrastive learning (InfoNCE, temperature 0.1) between two augmented views of the same window, using the EDA augmentations of [Matton et al. (2024)](https://github.com/kmatton/contrastive-learning-for-eda).
 - **Files:** see [Checkpoints and Weights](#checkpoints).
 - **Developed by:** Leonardo Alchieri, Università della Svizzera italiana (USI).
 - **Paper:** [doi.org/10.1145/3857981](https://doi.org/10.1145/3857981) · [arXiv:2603.16878](https://arxiv.org/abs/2603.16878)

@@ -1,4 +1,4 @@
-"""Setup script for the ``edamame`` package (UME foundation model for EDA)."""
+"""Setup script for the ``ume`` package (UME foundation model for EDA)."""
 
 import re
 from pathlib import Path
@@ -9,11 +9,11 @@ HERE = Path(__file__).parent
 
 
 def read_version() -> str:
-    """Read ``__version__`` from ``edamame/__init__.py`` (single source of truth)."""
-    init_py = (HERE / "edamame" / "__init__.py").read_text(encoding="utf-8")
+    """Read ``__version__`` from ``ume/__init__.py`` (single source of truth)."""
+    init_py = (HERE / "ume" / "__init__.py").read_text(encoding="utf-8")
     match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init_py, re.MULTILINE)
     if not match:
-        raise RuntimeError("Unable to find __version__ in edamame/__init__.py")
+        raise RuntimeError("Unable to find __version__ in ume/__init__.py")
     return match.group(1)
 
 
@@ -23,7 +23,7 @@ def read_long_description() -> str:
 
 
 # Core runtime dependencies: enough for inference and fine-tuning with
-# EdamamePipeline. Pretraining with train.py also needs the `train` extra.
+# UMEPipeline. Pretraining with train.py also needs the `train` extra.
 # The optional downstream evaluation in train.py additionally needs the
 # `edamame_downstream` package, installed separately (see README).
 INSTALL_REQUIRES = [
@@ -43,7 +43,7 @@ INSTALL_REQUIRES = [
     "packaging",
     "tables>=3.9",  # HDF5 (.h5) dataset loading
     "safetensors>=0.4",  # model.safetensors weights
-    "huggingface_hub>=0.20",  # EdamamePipeline.from_pretrained() Hub downloads
+    "huggingface_hub>=0.20",  # UMEPipeline.from_pretrained() Hub downloads
     "imbalanced-learn>=0.14,<0.15",
 ]
 
@@ -85,7 +85,7 @@ EXTRAS_REQUIRE["all"] = sorted(
 )
 
 setup(
-    name="edamame",
+    name="ume",
     version=read_version(),
     description="UME: a foundation model for wearable electrodermal-activity (EDA) signals.",
     long_description=read_long_description(),
@@ -94,7 +94,7 @@ setup(
     author_email="leonardo.alchieri@usi.ch",
     url="https://github.com/LeonardoAlchieri/eda-foundation-models",
     license="MIT",
-    packages=find_packages(include=["edamame", "edamame.*"]),
+    packages=find_packages(include=["ume", "ume.*"]),
     python_requires=">=3.12",
     install_requires=INSTALL_REQUIRES,
     extras_require=EXTRAS_REQUIRE,

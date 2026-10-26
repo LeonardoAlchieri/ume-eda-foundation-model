@@ -6,8 +6,8 @@ This module provides loss functions for different SSL paradigms:
 - Contrastive losses (NCE, NT-Xent, etc.)
 """
 
-from edamame.model.loss.reconstruction import DefaultMAELoss, StandardizedMAELoss
-from edamame.model.loss.contrastive import NCELoss
+from ume.model.loss.reconstruction import DefaultMAELoss, StandardizedMAELoss
+from ume.model.loss.contrastive import NCELoss
 
 __all__ = [
     "DefaultMAELoss",

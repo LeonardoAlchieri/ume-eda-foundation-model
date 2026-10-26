@@ -1,5 +1,5 @@
 """
-EdamamePipeline: Inference API for pretrained models.
+UMEPipeline: Inference API for pretrained models.
 
 This module provides a unified interface for loading and using pretrained models
 for embedding extraction and inference tasks.
@@ -25,7 +25,7 @@ HUB_WEIGHTS_FILENAME = "model.safetensors"
 HUB_CONFIG_FILENAME = "config.json"
 
 
-class EdamamePipeline:
+class UMEPipeline:
     """
     Pipeline for inference with pretrained models.
 
@@ -34,11 +34,11 @@ class EdamamePipeline:
 
     Example:
         >>> # Base UME from the Hugging Face Hub
-        >>> pipeline = EdamamePipeline.from_pretrained()
+        >>> pipeline = UMEPipeline.from_pretrained()
         >>> embeddings = pipeline.embed(batch_data)
         >>>
         >>> # Example with default (no normalization)
-        >>> pipeline = EdamamePipeline.from_pretrained(
+        >>> pipeline = UMEPipeline.from_pretrained(
         ...     model_name="mae",
         ...     weights_path="checkpoints/best.ckpt",
         ...     model_config="configs/train/model/mae.yaml",
@@ -52,7 +52,7 @@ class EdamamePipeline:
         ...     std = x.std(dim=1, unbiased=False, keepdim=True)
         ...     return (x - mean) / (std + 1e-8)
         >>> 
-        >>> pipeline = EdamamePipeline.from_pretrained(
+        >>> pipeline = UMEPipeline.from_pretrained(
         ...     model_name="mae",
         ...     weights_path="checkpoints/best.ckpt",
         ...     normalization_fn=z_normalize,
@@ -107,7 +107,7 @@ class EdamamePipeline:
         repo_id: Optional[str] = None,
         revision: Optional[str] = None,
         cache_dir: Optional[Union[str, Path]] = None,
-    ) -> "EdamamePipeline":
+    ) -> "UMEPipeline":
         """
         Load a pretrained model from a local checkpoint or the Hugging Face Hub.
 
@@ -139,7 +139,7 @@ class EdamamePipeline:
             cache_dir: Directory for the Hub download cache.
 
         Returns:
-            EdamamePipeline instance ready for inference
+            UMEPipeline instance ready for inference
 
         Raises:
             ValueError: If model_name is not supported
@@ -339,7 +339,7 @@ class EdamamePipeline:
         Returns:
             Loaded MAE model
         """
-        from edamame.model.mae import MaskedAutoencoder
+        from ume.model.mae import MaskedAutoencoder
 
         # Extract state dict - handle different checkpoint formats
         if "state_dict" in checkpoint:
@@ -351,7 +351,7 @@ class EdamamePipeline:
 
         # Infer model parameters from state dict if config is empty
         if not config_dict:
-            config_dict.update(EdamamePipeline._infer_mae_config_from_state_dict(state_dict))
+            config_dict.update(UMEPipeline._infer_mae_config_from_state_dict(state_dict))
 
         # Create model
         model = MaskedAutoencoder(**config_dict)
@@ -382,7 +382,7 @@ class EdamamePipeline:
         Returns:
             Loaded EfficientNet model
         """
-        from edamame.model.efficientnet_contrastive import EfficientNetContrastive
+        from ume.model.efficientnet_contrastive import EfficientNetContrastive
 
         # Extract state dict - handle different checkpoint formats
         if "state_dict" in checkpoint:
@@ -394,7 +394,7 @@ class EdamamePipeline:
 
         # Infer model parameters from state dict if config is empty
         if not config_dict:
-            config_dict.update(EdamamePipeline._infer_efficientnet_config_from_state_dict(state_dict))
+            config_dict.update(UMEPipeline._infer_efficientnet_config_from_state_dict(state_dict))
 
         # Create model
         model = EfficientNetContrastive(**config_dict)
@@ -425,7 +425,7 @@ class EdamamePipeline:
         Returns:
             Loaded Mantis model
         """
-        from edamame.model.mantis_contrastive import MantisContrastive
+        from ume.model.mantis_contrastive import MantisContrastive
         import torch.nn as nn
 
         # Extract state dict - handle different checkpoint formats
@@ -438,7 +438,7 @@ class EdamamePipeline:
 
         # Infer model parameters from state dict if config is empty
         if not config_dict:
-            config_dict.update(EdamamePipeline._infer_mantis_config_from_state_dict(state_dict))
+            config_dict.update(UMEPipeline._infer_mantis_config_from_state_dict(state_dict))
 
         # Ensure loss_fn exists (required by init but not used in eval)
         if "loss_fn" not in config_dict:
@@ -838,7 +838,7 @@ class EdamamePipeline:
         refit_on_full_data: bool = False,
         use_layer_norm: bool = True,
         verbose: bool = True,
-    ) -> "EdamamePipeline":
+    ) -> "UMEPipeline":
         """
         Fine-tune the pretrained UME (EfficientNet) encoder for classification.
 
@@ -921,7 +921,7 @@ class EdamamePipeline:
             self (fitted pipeline).
 
         Example:
-            >>> pipeline = EdamamePipeline.from_pretrained(
+            >>> pipeline = UMEPipeline.from_pretrained(
             ...     model_name="efficientnet", weights_path="artifacts/ume_base_training.ckpt")
             >>> pipeline.fit(X, y)              # y = vector of class labels
             >>> probs = pipeline.predict_proba(X)
@@ -1395,7 +1395,7 @@ class EdamamePipeline:
     def __repr__(self) -> str:
         """String representation of the pipeline."""
         return (
-            f"EdamamePipeline(\n"
+            f"UMEPipeline(\n"
             f"  model_name={self.model_name},\n"
             f"  device={self.device},\n"
             f"  model={self.model.__class__.__name__}\n"

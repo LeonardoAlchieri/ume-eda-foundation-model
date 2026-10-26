@@ -12,9 +12,9 @@ from pytorch_lightning.loggers import Logger
 import torch
 from torch.utils.data import DataLoader
 
-from edamame.engine import BaseSelfSupervisedEngine
-from edamame.utils.logging import log_hydra_config_to_lightning
-from edamame.utils.weights import _resolve_resume_checkpoint_path
+from ume.engine import BaseSelfSupervisedEngine
+from ume.utils.logging import log_hydra_config_to_lightning
+from ume.utils.weights import _resolve_resume_checkpoint_path
 
 logger = getLogger(__name__)
 

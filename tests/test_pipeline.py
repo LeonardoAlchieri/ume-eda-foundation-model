@@ -1,5 +1,5 @@
 """
-Unit tests for EdamamePipeline.
+Unit tests for UMEPipeline.
 """
 
 import pytest
@@ -7,12 +7,12 @@ import torch
 import tempfile
 from pathlib import Path
 
-from edamame.pipeline import EdamamePipeline
-from edamame.model.mae import MaskedAutoencoder
+from ume.pipeline import UMEPipeline
+from ume.model.mae import MaskedAutoencoder
 
 
-class TestEdamamePipeline:
-    """Test suite for EdamamePipeline."""
+class TestUMEPipeline:
+    """Test suite for UMEPipeline."""
     
     @pytest.fixture
     def mae_config(self):
@@ -58,7 +58,7 @@ class TestEdamamePipeline:
     
     def test_from_pretrained_with_config_dict(self, checkpoint_file, mae_config):
         """Test loading model with config dictionary."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -72,7 +72,7 @@ class TestEdamamePipeline:
     
     def test_from_pretrained_without_config(self, checkpoint_file):
         """Test loading model without config (auto-infer)."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=None,
@@ -85,7 +85,7 @@ class TestEdamamePipeline:
     
     def test_embed_basic(self, checkpoint_file, mae_config):
         """Test basic embedding extraction."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -107,7 +107,7 @@ class TestEdamamePipeline:
     
     def test_embed_no_masking(self, checkpoint_file, mae_config):
         """Test embedding extraction without masking."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -125,7 +125,7 @@ class TestEdamamePipeline:
     
     def test_embed_with_masking(self, checkpoint_file, mae_config):
         """Test embedding extraction with masking."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -144,7 +144,7 @@ class TestEdamamePipeline:
     
     def test_embed_return_mask(self, checkpoint_file, mae_config):
         """Test embedding extraction with mask information."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -166,7 +166,7 @@ class TestEdamamePipeline:
     
     def test_reconstruct(self, checkpoint_file, mae_config):
         """Test signal reconstruction."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -186,7 +186,7 @@ class TestEdamamePipeline:
     
     def test_reconstruct_with_mask_ratio(self, checkpoint_file, mae_config):
         """Test reconstruction with custom mask ratio."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -206,7 +206,7 @@ class TestEdamamePipeline:
     
     def test_callable_interface_embed(self, checkpoint_file, mae_config):
         """Test using pipeline as callable for embedding."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -223,7 +223,7 @@ class TestEdamamePipeline:
     
     def test_callable_interface_reconstruct(self, checkpoint_file, mae_config):
         """Test using pipeline as callable for reconstruction."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -240,7 +240,7 @@ class TestEdamamePipeline:
     
     def test_device_mapping_auto(self, checkpoint_file, mae_config):
         """Test automatic device mapping."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -258,7 +258,7 @@ class TestEdamamePipeline:
     
     def test_device_mapping_cpu(self, checkpoint_file, mae_config):
         """Test CPU device mapping."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -270,7 +270,7 @@ class TestEdamamePipeline:
     def test_invalid_model_name(self, checkpoint_file, mae_config):
         """Test that invalid model name raises error."""
         with pytest.raises(ValueError, match="not supported"):
-            EdamamePipeline.from_pretrained(
+            UMEPipeline.from_pretrained(
                 model_name="invalid_model",
                 weights_path=checkpoint_file,
                 model_config=mae_config,
@@ -280,7 +280,7 @@ class TestEdamamePipeline:
     def test_invalid_checkpoint_path(self, mae_config):
         """Test that invalid checkpoint path raises error."""
         with pytest.raises(FileNotFoundError):
-            EdamamePipeline.from_pretrained(
+            UMEPipeline.from_pretrained(
                 model_name="mae",
                 weights_path="nonexistent_checkpoint.ckpt",
                 model_config=mae_config,
@@ -289,7 +289,7 @@ class TestEdamamePipeline:
     
     def test_repr(self, checkpoint_file, mae_config):
         """Test string representation."""
-        pipeline = EdamamePipeline.from_pretrained(
+        pipeline = UMEPipeline.from_pretrained(
             model_name="mae",
             weights_path=checkpoint_file,
             model_config=mae_config,
@@ -297,7 +297,7 @@ class TestEdamamePipeline:
         )
         
         repr_str = repr(pipeline)
-        assert "EdamamePipeline" in repr_str
+        assert "UMEPipeline" in repr_str
         assert "mae" in repr_str
         assert "MaskedAutoencoder" in repr_str
 
@@ -308,7 +308,7 @@ class TestFitRefitOnFullData:
     @pytest.fixture
     def pipeline(self):
         """Pipeline wrapping a tiny EfficientNet (UME) encoder."""
-        from edamame.model.efficientnet_contrastive import EfficientNetContrastive
+        from ume.model.efficientnet_contrastive import EfficientNetContrastive
 
         torch.manual_seed(0)
         model = EfficientNetContrastive(
@@ -320,7 +320,7 @@ class TestFitRefitOnFullData:
             head_channels=8,
             embedding_dim=16,
         )
-        return EdamamePipeline(
+        return UMEPipeline(
             model=model,
             model_name="efficientnet",
             device=torch.device("cpu"),

@@ -7875,7 +7875,7 @@ packages:
 - pypi: ../pretrained_foundation_models_physiological_data
   name: edamame-downstream
 - pypi: ./
-  name: edamame
+  name: ume
   requires_dist:
   - torch>=2.0.0
   - torchvision>=0.21.0
@@ -7892,6 +7892,8 @@ packages:
   - torchmetrics
   - packaging
   - tables>=3.9
+  - safetensors>=0.4
+  - huggingface-hub>=0.20
   - imbalanced-learn>=0.14,<0.15
   - neurokit2>=0.2.13,<0.3 ; extra == 'train'
   - umap-learn>=0.5.11,<0.6 ; extra == 'train'

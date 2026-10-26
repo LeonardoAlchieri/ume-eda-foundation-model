@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import torch
 
-from edamame.engine.contrastive import ContrastiveEngine
+from ume.engine.contrastive import ContrastiveEngine
 
 
 class _LoaderLengthProxy:

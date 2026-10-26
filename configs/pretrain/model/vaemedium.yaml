@@ -1,4 +1,4 @@
 # Encoder-Decoder model configuration
 
-_target_: edamame.model.vae.VAEMedium
+_target_: ume.model.vae.VAEMedium
 in_dim: 120

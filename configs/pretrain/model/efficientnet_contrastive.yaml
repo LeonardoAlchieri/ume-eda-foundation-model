@@ -1,6 +1,6 @@
 # EfficientNet-based contrastive model configuration
 
-_target_: edamame.model.efficientnet_contrastive.EfficientNetContrastive
+_target_: ume.model.efficientnet_contrastive.EfficientNetContrastive
 
 # Input specifications
 in_channels: 1
@@ -20,6 +20,6 @@ dropout: 0.1
 
 # Loss function configuration
 loss_fn:
-  _target_: edamame.model.loss.contrastive.NCELoss
+  _target_: ume.model.loss.contrastive.NCELoss
   temperature: 0.1
   ignore_keys: true

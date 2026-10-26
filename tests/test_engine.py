@@ -16,7 +16,7 @@ from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 from torchmetrics import Accuracy, MeanSquaredError
 import pytorch_lightning as pl
 
-from edamame.engine import (
+from ume.engine import (
     BaseSelfSupervisedEngine,
     ContrastiveEngine,
     ReconstructionEngine,

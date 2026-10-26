@@ -1,5 +1,5 @@
 """
-Example demonstrating EdamamePipeline with different normalization functions.
+Example demonstrating UMEPipeline with different normalization functions.
 
 This example shows how to use the pipeline with:
 1. No normalization (default)
@@ -14,7 +14,7 @@ The released base UME weights are used in examples/pipeline_usage.py.
 """
 
 import torch
-from edamame.pipeline import EdamamePipeline
+from ume.pipeline import UMEPipeline
 
 
 def z_normalize(x: torch.Tensor) -> torch.Tensor:
@@ -67,7 +67,7 @@ def robust_normalize(x: torch.Tensor) -> torch.Tensor:
 def main():
     # Example 1: No normalization (default)
     print("Example 1: Pipeline without normalization")
-    pipeline_no_norm = EdamamePipeline.from_pretrained(
+    pipeline_no_norm = UMEPipeline.from_pretrained(
         model_name="mae",
         weights_path="checkpoints/best.ckpt",
         device_map="auto",
@@ -82,7 +82,7 @@ def main():
     
     # Example 2: Z-score normalization
     print("Example 2: Pipeline with z-score normalization")
-    pipeline_z_norm = EdamamePipeline.from_pretrained(
+    pipeline_z_norm = UMEPipeline.from_pretrained(
         model_name="mae",
         weights_path="checkpoints/best.ckpt",
         device_map="auto",
@@ -95,7 +95,7 @@ def main():
     
     # Example 3: Min-max normalization
     print("Example 3: Pipeline with min-max normalization")
-    pipeline_minmax = EdamamePipeline.from_pretrained(
+    pipeline_minmax = UMEPipeline.from_pretrained(
         model_name="mae",
         weights_path="checkpoints/best.ckpt",
         device_map="auto",
@@ -108,7 +108,7 @@ def main():
     
     # Example 4: Robust normalization
     print("Example 4: Pipeline with robust normalization")
-    pipeline_robust = EdamamePipeline.from_pretrained(
+    pipeline_robust = UMEPipeline.from_pretrained(
         model_name="mae",
         weights_path="checkpoints/best.ckpt",
         device_map="auto",
@@ -121,7 +121,7 @@ def main():
     
     # Example 5: Lambda function for inline normalization
     print("Example 5: Pipeline with lambda normalization")
-    pipeline_lambda = EdamamePipeline.from_pretrained(
+    pipeline_lambda = UMEPipeline.from_pretrained(
         model_name="mae",
         weights_path="checkpoints/best.ckpt",
         device_map="auto",
@@ -141,7 +141,7 @@ def main():
         return (x - x.mean(dim=1, keepdim=True)) / (x.std(dim=1, keepdim=True) + 1e-8)
     
     # Use in dataset
-    from edamame.data.dataset import EDAtaNoLabel
+    from ume.data.dataset import EDAtaNoLabel
     dataset = EDAtaNoLabel(
         base_path="data/60s",
         dataset_names=["APSync", "BiHeartS"],
@@ -149,7 +149,7 @@ def main():
     )
     
     # Use in pipeline
-    pipeline = EdamamePipeline.from_pretrained(
+    pipeline = UMEPipeline.from_pretrained(
         model_name="mae",
         weights_path="checkpoints/best.ckpt",
         normalization_fn=my_normalization,  # Same normalization
@@ -167,7 +167,7 @@ def main():
     
     # Example 7: Reconstruction with normalization
     print("Example 7: Reconstruction with normalization")
-    pipeline_recon = EdamamePipeline.from_pretrained(
+    pipeline_recon = UMEPipeline.from_pretrained(
         model_name="mae",
         weights_path="checkpoints/best.ckpt",
         device_map="auto",

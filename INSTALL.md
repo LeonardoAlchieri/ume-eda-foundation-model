@@ -10,7 +10,7 @@ cd eda-foundation-models
 pixi install --frozen
 ```
 
-This installs everything needed for inference, fine-tuning and pretraining, with `edamame` itself in editable mode. `--frozen` installs from `pixi.lock` without re-checking the optional `downstream` environment, which needs a sibling repository (see [Downstream evaluation](#downstream-evaluation-optional)).
+This installs everything needed for inference, fine-tuning and pretraining, with `ume` itself in editable mode. `--frozen` installs from `pixi.lock` without re-checking the optional `downstream` environment, which needs a sibling repository (see [Downstream evaluation](#downstream-evaluation-optional)).
 
 Run commands inside the environment with `pixi run`, e.g. `pixi run python train.py --config-name conf-ume`.
 
@@ -22,7 +22,7 @@ cd eda-foundation-models
 pip install -e .
 ```
 
-The base install covers inference and fine-tuning with `EdamamePipeline`. Add extras as needed:
+The base install covers inference and fine-tuning with `UMEPipeline`. Add extras as needed:
 
 | Extra | Adds | Needed for |
 |-------|------|------------|
@@ -73,5 +73,5 @@ python -m pytest tests/             # needs the `dev` extra with pip
 ## Uninstall
 
 ```bash
-pip uninstall edamame
+pip uninstall ume
 ```

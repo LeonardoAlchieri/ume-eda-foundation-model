@@ -9,7 +9,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from edamame.model.loss.reconstruction import DefaultMAELoss
+from ume.model.loss.reconstruction import DefaultMAELoss
 
 
 class TestDefaultMAELoss:
@@ -341,7 +341,7 @@ class TestMAELossIntegration:
     
     def test_mae_model_with_loss(self):
         """Test MAE model with DefaultMAELoss integration."""
-        from edamame.model.mae import MaskedAutoencoder
+        from ume.model.mae import MaskedAutoencoder
         
         # Create model with default loss
         model = MaskedAutoencoder(seq_len=120, in_channels=1, patch_size=10)
@@ -353,7 +353,7 @@ class TestMAELossIntegration:
     
     def test_mae_forward_and_loss(self):
         """Test full forward pass and loss computation."""
-        from edamame.model.mae import MaskedAutoencoder
+        from ume.model.mae import MaskedAutoencoder
         
         batch_size = 4
         seq_len = 120
@@ -378,7 +378,7 @@ class TestMAELossIntegration:
     
     def test_mae_custom_loss_function(self):
         """Test MAE model with custom loss function."""
-        from edamame.model.mae import MaskedAutoencoder
+        from ume.model.mae import MaskedAutoencoder
         
         # Create custom loss instance
         custom_loss = DefaultMAELoss()
@@ -397,7 +397,7 @@ class TestMAELossIntegration:
     
     def test_mae_backward_pass(self):
         """Test that backward pass works correctly with loss."""
-        from edamame.model.mae import MaskedAutoencoder
+        from ume.model.mae import MaskedAutoencoder
         
         batch_size = 2
         seq_len = 120

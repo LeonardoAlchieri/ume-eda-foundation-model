@@ -11,7 +11,7 @@ import torch
 from pathlib import Path
 import tempfile
 import shutil
-from edamame.data.dataset import EDAtaNoLabel
+from ume.data.dataset import EDAtaNoLabel
 
 
 def _groups(n, n_users=5):

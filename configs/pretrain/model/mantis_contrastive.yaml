@@ -1,6 +1,6 @@
 # Mantis-based contrastive model configuration
 
-_target_: edamame.model.mantis_contrastive.MantisContrastive
+_target_: ume.model.mantis_contrastive.MantisContrastive
 
 model_name: "paris-noah/Mantis-8M"
 architecture: "Mantis8M"
@@ -14,7 +14,7 @@ channels_strategy: "concat"
 device: ${accelerator}
 
 loss_fn:
-  _target_: edamame.model.loss.contrastive.NCELoss
+  _target_: ume.model.loss.contrastive.NCELoss
   temperature: 0.1
   ignore_keys: true
 

@@ -14,7 +14,7 @@ import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend for server environments
 
 
-from edamame.engine.base import BaseSelfSupervisedEngine
+from ume.engine.base import BaseSelfSupervisedEngine
 
 
 class ReconstructionEngine(BaseSelfSupervisedEngine):

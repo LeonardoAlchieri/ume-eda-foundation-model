@@ -14,7 +14,7 @@ import torch.nn as nn
 import numpy as np
 from unittest.mock import Mock, patch, MagicMock
 
-from edamame.engine import ContrastiveEngine
+from ume.engine import ContrastiveEngine
 
 
 # ============================================================================
@@ -449,7 +449,7 @@ class TestTrainingValidationStepIntegration:
 _EPOCH_END_HOOKS_DISABLED = pytest.mark.skip(
     reason=(
         "ContrastiveEngine.on_train_epoch_end / on_validation_epoch_end (UMAP "
-        "plotting) are intentionally commented out in edamame/engine/contrastive.py."
+        "plotting) are intentionally commented out in ume/engine/contrastive.py."
     )
 )
 

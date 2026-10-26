@@ -3,8 +3,8 @@ import pytest
 import torch
 from scipy import signal
 
-from edamame.data_augmentation import matton_augment as np_aug
-from edamame.data_augmentation import matton_augment_torch as torch_aug
+from ume.data_augmentation import matton_augment as np_aug
+from ume.data_augmentation import matton_augment_torch as torch_aug
 
 
 def _band_power(signal: np.ndarray, fs: float, f_low: float, f_high: float) -> float:

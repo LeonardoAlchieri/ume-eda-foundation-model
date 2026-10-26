@@ -1,6 +1,6 @@
 # Tests
 
-Pytest suite for the `edamame` package. All tests run on synthetic data built
+Pytest suite for the `ume` package. All tests run on synthetic data built
 in tmp dirs: no private data (`*.nosync`), no network, no GPU required.
 
 ## Running
@@ -32,10 +32,10 @@ Pytest options live in `pyproject.toml` (`[tool.pytest.ini_options]`: `-v`,
 | `test_dataset_online_mapping.py` | `EDAtaNoLabelOnlineSegmentation` on synthetic HDF5 stores (one key per recording, a `Timestamp` column, and `metadata` attrs): window counts, `idx_to_series`/`idx_to_position`/`series_to_idx`, segment extraction, skipping short recordings, `subsample`, `user_session_splitting` without recording leakage. |
 | `test_mae_loss.py` | `DefaultMAELoss`, which returns `(total, masked, visible)`: MAE/MSE values, `masked_weight` mixing, edge cases, gradients. Also checks integration with `MaskedAutoencoder`. |
 | `test_matton_augment_torch.py` | The torch Matton augmentations: output contract, plus statistical and spectral agreement with the NumPy versions. |
-| `test_pipeline.py` | `EdamamePipeline`: `from_pretrained` (MAE, with and without config), device mapping (`auto` picks MPS, then CUDA, then CPU), `embed`/`reconstruct`, errors, and `fit(refit_on_full_data=True)`. |
+| `test_pipeline.py` | `UMEPipeline`: `from_pretrained` (MAE, with and without config), device mapping (`auto` picks MPS, then CUDA, then CPU), `embed`/`reconstruct`, errors, and `fit(refit_on_full_data=True)`. |
 
 ## Skipped tests
 
 - `test_contrastive_embedding_collection.py::TestEpochEndHooks` is **skipped**
-  because the UMAP epoch-end hooks in `edamame/engine/contrastive.py` are
+  because the UMAP epoch-end hooks in `ume/engine/contrastive.py` are
   commented out. Re-enable the tests together with the hooks.

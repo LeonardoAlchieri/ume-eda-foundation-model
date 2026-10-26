@@ -1,6 +1,6 @@
 # Mantis-aligned contrastive engine configuration
 
-_target_: edamame.engine.MantisContrastiveEngine
+_target_: ume.engine.MantisContrastiveEngine
 
 model: ${pretrain.model}
 seed: ${seed}

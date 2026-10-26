@@ -1,4 +1,4 @@
 # Encoder-Decoder model configuration
 
-_target_: edamame.model.vae.VariationalAutoencoder
+_target_: ume.model.vae.VariationalAutoencoder
 in_dim: 120

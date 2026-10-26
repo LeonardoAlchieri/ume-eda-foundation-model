@@ -2,13 +2,13 @@
 Model implementations for EDA foundation models.
 """
 
-from edamame.model.vae import VariationalAutoencoder, VAEMedium
-from edamame.model.mae import MaskedAutoencoder
-from edamame.model.encoder_decoder import EncoderDecoderModel
-from edamame.model.matton_constrastive import ContrastiveModel
-from edamame.model.efficientnet_contrastive import EfficientNetContrastive, MBConv1D
-from edamame.model.mantis_contrastive import MantisContrastive
-from edamame.model.resnet_contrastive import (
+from ume.model.vae import VariationalAutoencoder, VAEMedium
+from ume.model.mae import MaskedAutoencoder
+from ume.model.encoder_decoder import EncoderDecoderModel
+from ume.model.matton_constrastive import ContrastiveModel
+from ume.model.efficientnet_contrastive import EfficientNetContrastive, MBConv1D
+from ume.model.mantis_contrastive import MantisContrastive
+from ume.model.resnet_contrastive import (
     ResNetContrastive,
     BasicBlock1D,
     BottleneckBlock1D,

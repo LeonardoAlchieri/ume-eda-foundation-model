@@ -1,5 +1,4 @@
-# Example: Reconstruction Learning with TensorBoard
-# Run with: python train.py --config-name=example_reconstruction
+# Masked-autoencoder pretraining profile (reconstruction SSL)
 
 defaults:
   - model: mae
@@ -59,5 +58,5 @@ engine:
     eta_min: 0.00001
 
 dataset_scaling_fun:
-  _target_: edamame.utils.dataset_scaling.get_empty_scaling_params
+  _target_: ume.utils.dataset_scaling.get_empty_scaling_params
   _partial_: true

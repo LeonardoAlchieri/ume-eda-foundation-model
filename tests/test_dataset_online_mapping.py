@@ -22,8 +22,8 @@ import pandas as pd
 import pytest
 import torch
 
-from edamame.data.dataset_online import EDAtaNoLabelOnlineSegmentation
-from edamame.utils.splitting import user_session_splitting
+from ume.data.dataset_online import EDAtaNoLabelOnlineSegmentation
+from ume.utils.splitting import user_session_splitting
 
 N_CHANNELS = 3
 

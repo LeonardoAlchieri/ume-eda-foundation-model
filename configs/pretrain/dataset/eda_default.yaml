@@ -1,6 +1,6 @@
 # Default dataset configuration
 
-_target_: edamame.data.dataset_online.EDAtaNoLabelOnlineSegmentation
+_target_: ume.data.dataset_online.EDAtaNoLabelOnlineSegmentation
 base_path: "./data.nosync/online/"
 # The top-level configs (e.g. conf-ume.yaml) override this list with the
 # datasets actually used for pretraining.
@@ -23,5 +23,5 @@ sample_scaling_method: null
 segment_length: ${segment_length}
 shift: 1
 splitting_method:
-  _target_: edamame.utils.splitting.user_session_splitting
+  _target_: ume.utils.splitting.user_session_splitting
   _partial_: true

@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from edamame.model.loss import DefaultMAELoss
+from ume.model.loss import DefaultMAELoss
 
 
 class PatchEmbedding(nn.Module):

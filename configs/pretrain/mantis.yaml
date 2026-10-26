@@ -38,5 +38,5 @@ dataloader:
   persistent_workers: true
 
 dataset_scaling_fun:
-  _target_: edamame.utils.dataset_scaling.get_empty_scaling_params
+  _target_: ume.utils.dataset_scaling.get_empty_scaling_params
   _partial_: true

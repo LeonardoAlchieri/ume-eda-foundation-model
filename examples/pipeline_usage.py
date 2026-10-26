@@ -10,7 +10,7 @@ from sys import path
 path.append("./")
 import torch
 
-from edamame.pipeline import EdamamePipeline
+from ume.pipeline import UMEPipeline
 
 
 def main() -> None:
@@ -25,7 +25,7 @@ def main() -> None:
         print("Please place the base UME weights at artifacts/ume_base_inference.pt.")
         return
 
-    pipeline = EdamamePipeline.from_pretrained(
+    pipeline = UMEPipeline.from_pretrained(
         model_name="efficientnet",
         weights_path=str(weights_path)
     )

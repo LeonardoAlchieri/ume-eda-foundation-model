@@ -1,7 +1,7 @@
 [workspace]
 channels = ["conda-forge"]
 name = "eda-foundation-models"
-platforms = ["osx-arm64", "linux-64"]
+platforms = ["osx-arm64", { platform = "linux-64", cuda = "12" }]
 version = "0.1.0"
 
 [tasks]
@@ -29,11 +29,8 @@ pytorch = ">=2.6.0,<3"
 [target.linux-64.dependencies]
 pytorch-gpu = ">=2.6.0,<3"
 
-[system-requirements]
-cuda = "12"
-
 [pypi-dependencies]
-edamame = { path = ".", editable = true }
+ume = { path = ".", editable = true }
 mantis-tsfm = ">=1.0.0, <2"
 hydra-list-sweeper = ">=1.1.0, <2"
 umap-learn = ">=0.5.11, <0.6"

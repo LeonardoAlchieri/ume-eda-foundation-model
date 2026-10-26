@@ -35,10 +35,10 @@ pip install git+https://github.com/LeonardoAlchieri/eda-foundation-models.git
 
 ```python
 import torch
-from edamame import EdamamePipeline
+from ume import UMEPipeline
 
 # Downloads the base UME weights from the Hugging Face Hub
-pipeline = EdamamePipeline.from_pretrained()
+pipeline = UMEPipeline.from_pretrained()
 
 # NOTE: default UME requires 60s windows (at 4Hz sampling rate) and 3 channels (mixed, phasic and tonic)
 x = torch.randn(8, 240, 3)  # (batch, seq_len, channels)
@@ -46,7 +46,7 @@ embeddings = pipeline.embed(x)
 print(embeddings.shape)  # (8, 64)
 ```
 
-To load from a local clone instead, pass the weights file: `EdamamePipeline.from_pretrained(weights_path="model.safetensors")` (see [Checkpoints and Weights](#checkpoints)). A runnable walkthrough is in [`notebook/pipeline_demo.ipynb`](notebook/pipeline_demo.ipynb); for other ways to install, see [Installation](#installation).
+To load from a local clone instead, pass the weights file: `UMEPipeline.from_pretrained(weights_path="model.safetensors")` (see [Checkpoints and Weights](#checkpoints)). A runnable walkthrough is in [`notebook/pipeline_demo.ipynb`](notebook/pipeline_demo.ipynb); for other ways to install, see [Installation](#installation).
 
 ---
 
@@ -81,7 +81,7 @@ We release the weights for base UME, the default and suggested configuration, as
 ## 🪪 Model Card
 
 - **What it is:** an encoder that turns 60-second windows of wrist electrodermal activity (EDA) into 64-dimensional embeddings.
-- **Architecture:** EfficientNet-style 1D CNN (stem convolution, 16 MBConv1D blocks with squeeze-and-excitation, head convolution, global average pooling, linear projection). See [`edamame/model/efficientnet_contrastive.py`](edamame/model/efficientnet_contrastive.py) and [UME Architecture](#architecture).
+- **Architecture:** EfficientNet-style 1D CNN (stem convolution, 16 MBConv1D blocks with squeeze-and-excitation, head convolution, global average pooling, linear projection). See [`ume/model/efficientnet_contrastive.py`](ume/model/efficientnet_contrastive.py) and [UME Architecture](#architecture).
 - **Training objective:** sample-wise contrastive learning (InfoNCE, temperature 0.1) between two augmented views of the same window, using the EDA augmentations of [Matton et al. (2024)](https://arxiv.org/abs/2404.08783).
 - **Files:** see [Checkpoints and Weights](#checkpoints).
 - **Developed by:** Leonardo Alchieri, Università della Svizzera italiana (USI).
@@ -96,7 +96,7 @@ We release the weights for base UME, the default and suggested configuration, as
 ### Intended use
 
 - Extracting features from wearable EDA for research on downstream tasks such as stress, cognitive load, or sleep/wake classification.
-- Fine-tuning on a labelled research dataset with `EdamamePipeline.fit` (see [Fine-Tune](#fine-tune)).
+- Fine-tuning on a labelled research dataset with `UMEPipeline.fit` (see [Fine-Tune](#fine-tune)).
 
 ### Out-of-scope use
 
@@ -140,7 +140,7 @@ pixi install --frozen
 ### pip
 
 ```bash
-pip install -e .            # inference and fine-tuning (EdamamePipeline)
+pip install -e .            # inference and fine-tuning (UMEPipeline)
 pip install -e ".[train]"   # + everything train.py needs for pretraining
 ```
 
@@ -170,9 +170,9 @@ Beyond frozen-feature extraction, the pipeline can be **supervised fine-tuned** 
 
 ```python
 import torch
-from edamame import EdamamePipeline
+from ume import UMEPipeline
 
-pipeline = EdamamePipeline.from_pretrained()
+pipeline = UMEPipeline.from_pretrained()
 
 X = torch.randn(256, 240, 3)              # (n_samples, seq_len, channels)
 y = torch.randint(0, 2, (256,)).numpy()   # labels may be ints or strings
@@ -400,7 +400,7 @@ Three files hold the same base UME weights:
 
 Use `ume_base_training.ckpt` only to resume pretraining. For inference and fine-tuning, use `model.safetensors` or `ume_base_inference.pt`.
 
-`EdamamePipeline.from_pretrained` accepts any of them through `weights_path`. With no `weights_path`, it downloads `model.safetensors` and `config.json` from the Hub repo given by `repo_id` (default: the released base UME); `revision` and `cache_dir` are passed to the download.
+`UMEPipeline.from_pretrained` accepts any of them through `weights_path`. With no `weights_path`, it downloads `model.safetensors` and `config.json` from the Hub repo given by `repo_id` (default: the released base UME); `revision` and `cache_dir` are passed to the download.
 
 ---
 

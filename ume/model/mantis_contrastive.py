@@ -1,7 +1,7 @@
 """
 Mantis-based contrastive model wrapper.
 
-This module adapts Mantis foundation models to Edamame's contrastive interface:
+This module adapts Mantis foundation models to UME's contrastive interface:
 - forward(x_1, x_2)
 - loss(output, batch, step)
 - get_representation(x)
@@ -125,7 +125,7 @@ class MantisContrastive(nn.Module):
         if x.dim() == 2:
             x = x.unsqueeze(1)
         elif x.dim() == 3:
-            # Common Edamame format: (batch, seq_len, channels)
+            # Common UME format: (batch, seq_len, channels)
             if x.shape[-1] <= 16 and x.shape[1] > x.shape[-1]:
                 x = x.transpose(1, 2)
             # If already (batch, channels, seq_len), keep as is.

@@ -4,7 +4,7 @@ defaults:
   - _self_
   - override /hydra/sweeper: list
 
-project_name: EDAMAME-pretrain-postsubmission
+project_name: UME
 group_name: "finetune-mantis-alldata-${channels}-contrastive"
 # group naming convention: pretrain vs finetune - model/architecture name - datasets - channels - pretrain method (e.g. reconstruction)
 

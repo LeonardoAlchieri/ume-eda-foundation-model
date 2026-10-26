@@ -6,7 +6,7 @@ matplotlib.use("Agg")  # Non-interactive backend for server environments
 import matplotlib.pyplot as plt
 from umap import UMAP
 
-from edamame.engine.base import BaseSelfSupervisedEngine
+from ume.engine.base import BaseSelfSupervisedEngine
 
 
 class ContrastiveEngine(BaseSelfSupervisedEngine):

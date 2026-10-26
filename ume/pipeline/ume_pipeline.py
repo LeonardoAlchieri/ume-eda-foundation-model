@@ -20,7 +20,7 @@ from omegaconf import DictConfig, OmegaConf
 import yaml
 
 # Hugging Face Hub repository holding the released base UME weights.
-DEFAULT_REPO_ID = "LeonardoAlchieri/UME"
+DEFAULT_REPO_ID = "PCC-Lab-USI/UME-eda-foundation-model"
 HUB_WEIGHTS_FILENAME = "model.safetensors"
 HUB_CONFIG_FILENAME = "config.json"
 

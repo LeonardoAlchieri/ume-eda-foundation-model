@@ -4,4 +4,4 @@ from ume.pipeline import UMEPipeline
 
 __all__ = ["UMEPipeline"]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

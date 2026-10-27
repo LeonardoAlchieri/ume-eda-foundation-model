@@ -14,9 +14,9 @@ tags:
 
 # 🌸 UME: Foundation Model for Electrodermal Activity (EDA) Signals
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
-[![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
+[![Lightning](https://img.shields.io/badge/Lightning-2.6+-792ee5.svg)](https://lightning.ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DOI](https://img.shields.io/badge/DOI-10.1145%2F3857981-blue.svg)](https://doi.org/10.1145/3857981)
 [![arXiv](https://img.shields.io/badge/arXiv-2603.16878-b31b1b.svg)](https://arxiv.org/abs/2603.16878)

@@ -26,34 +26,44 @@ def read_long_description() -> str:
 # UMEPipeline. Pretraining with train.py also needs the `train` extra.
 # The optional downstream evaluation in train.py additionally needs the
 # `edamame_downstream` package, installed separately (see README).
+#
+# Floors are the first releases of each compiled package that work with both
+# NumPy 1.x and 2.x, so any combination pip picks is binary-compatible; upper
+# bounds are only set on major versions, so the package installs alongside the
+# user's existing environment.
 INSTALL_REQUIRES = [
-    "torch>=2.0.0",
-    "torchvision>=0.21.0",
-    "pytorch-lightning>=2.6.1,<3",
-    "hydra-core>=1.3.2,<2",
-    "omegaconf>=2.3,<3",
-    "wandb>=0.25.1,<0.26",
-    "numpy>=2.0,<3",
-    "pandas<3.0",
-    "scipy>=1.10",
+    # Intel Macs top out at torch 2.2.2, which is built against NumPy 1.x and
+    # fails at runtime ("Numpy is not available") with NumPy 2.
+    'torch>=2.3; platform_system != "Darwin" or platform_machine != "x86_64"',
+    'torch>=2.0; platform_system == "Darwin" and platform_machine == "x86_64"',
+    "numpy>=1.24",
+    'numpy<2; platform_system == "Darwin" and platform_machine == "x86_64"',
+    "scipy>=1.13",
+    # scipy 1.15 macOS wheels fail to load on macOS 27; Python 3.11+ resolves
+    # to scipy >= 1.16 anyway.
+    'scipy!=1.15.*; platform_system == "Darwin" and python_version < "3.11"',
+    "pandas>=2.2.2",
+    "scikit-learn>=1.4.2",
+    "matplotlib>=3.8.4",  # imported by ume.model (plots)
     "tqdm>=4.60",
-    "pyyaml",
-    "scikit-learn",
-    "torchmetrics",
-    "packaging",
-    "tables>=3.9",  # HDF5 (.h5) dataset loading
+    "pyyaml>=6.0",
+    "omegaconf>=2.3,<3",
     "safetensors>=0.4",  # model.safetensors weights
     "huggingface_hub>=0.20",  # UMEPipeline.from_pretrained() Hub downloads
-    "imbalanced-learn>=0.14,<0.15",
-    "matplotlib>=3.7",  # imported by ume.model / ume.engine (plots)
 ]
 
 EXTRAS_REQUIRE = {
-    # Everything train.py needs for pretraining.
+    # Everything train.py needs for pretraining (and the test suite).
     "train": [
-        "neurokit2>=0.2.13,<0.3",
-        "umap-learn>=0.5.11,<0.6",
+        "pytorch-lightning>=2.6,<3",  # train.py passes weights_only to Trainer.fit
+        "torchmetrics>=1.0",
+        "torchvision>=0.15",  # augmentation pipeline in configs/pretrain
+        "hydra-core>=1.3.2,<2",
         "hydra-list-sweeper>=1.1.0,<2",
+        "wandb>=0.19.9",  # configs use reinit="finish_previous"
+        "tables>=3.10",  # HDF5 (.h5) dataset loading
+        "neurokit2>=0.2.10",
+        "umap-learn>=0.5.4",
     ],
     "mantis": [
         "mantis-tsfm>=1.0.0,<2",
@@ -66,7 +76,7 @@ EXTRAS_REQUIRE = {
         "isort",
     ],
     "signal": [
-        "neurokit2>=0.2.13,<0.3",
+        "neurokit2>=0.2.10",
     ],
     "notebook": [
         "jupyter",
@@ -74,7 +84,7 @@ EXTRAS_REQUIRE = {
         "ipykernel",
     ],
     "viz": [
-        "umap-learn>=0.5.11,<0.6",
+        "umap-learn>=0.5.4",
     ],
 }
 # `all` = union of every optional group.
@@ -93,13 +103,17 @@ setup(
     url="https://github.com/LeonardoAlchieri/eda-foundation-models",
     license="MIT",
     packages=find_packages(include=["ume", "ume.*"]),
-    python_requires=">=3.12",
+    python_requires=">=3.10",
     install_requires=INSTALL_REQUIRES,
     extras_require=EXTRAS_REQUIRE,
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Operating System :: OS Independent",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",

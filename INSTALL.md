@@ -1,6 +1,6 @@
 # Installation Guide
 
-Requires **Python 3.12 or newer**. Dependencies are declared in [`setup.py`](setup.py) (pip) and [`pixi.toml`](pixi.toml) (Pixi).
+Requires **Python 3.12 or newer**. Dependencies are declared in [`setup.py`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/setup.py) (pip) and [`pixi.toml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/pixi.toml) (Pixi).
 
 ## Option 1: Pixi (recommended)
 
@@ -15,6 +15,15 @@ This installs everything needed for inference, fine-tuning and pretraining, with
 Run commands inside the environment with `pixi run`, e.g. `pixi run python train.py --config-name conf-ume`.
 
 ## Option 2: pip
+
+From PyPI (package `ume-eda`, imported as `ume`):
+
+```bash
+pip install ume-eda
+pip install "ume-eda[train,dev]"   # with extras
+```
+
+From source:
 
 ```bash
 git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git

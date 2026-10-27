@@ -30,8 +30,10 @@ See also 🫛 **EDAMAME**, the large-scale EDA pretraining collection we curated
 ## 🚀 Quick Use (UME)
 
 ```bash
-pip install git+https://github.com/LeonardoAlchieri/eda-foundation-models.git
+pip install ume-eda
 ```
+
+The package installs as `ume-eda` and imports as `ume`. For the latest development version: `pip install git+https://github.com/LeonardoAlchieri/eda-foundation-models.git`.
 
 ```python
 import torch
@@ -46,7 +48,7 @@ embeddings = pipeline.embed(x)
 print(embeddings.shape)  # (8, 64)
 ```
 
-To load from a local clone instead, pass the weights file: `UMEPipeline.from_pretrained(weights_path="model.safetensors")` (see [Checkpoints and Weights](#checkpoints)). A runnable walkthrough is in [`notebook/pipeline_demo.ipynb`](notebook/pipeline_demo.ipynb); for other ways to install, see [Installation](#installation).
+To load from a local clone instead, pass the weights file: `UMEPipeline.from_pretrained(weights_path="model.safetensors")` (see [Checkpoints and Weights](#checkpoints)). A runnable walkthrough is in [`notebook/pipeline_demo.ipynb`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/notebook/pipeline_demo.ipynb); for other ways to install, see [Installation](#installation).
 
 ---
 
@@ -81,7 +83,7 @@ We release the weights for base UME, the default and suggested configuration, as
 ## 🪪 Model Card
 
 - **What it is:** an encoder that turns 60-second windows of wrist electrodermal activity (EDA) into 64-dimensional embeddings.
-- **Architecture:** EfficientNet-style 1D CNN (stem convolution, 16 MBConv1D blocks with squeeze-and-excitation, head convolution, global average pooling, linear projection). See [`ume/model/efficientnet_contrastive.py`](ume/model/efficientnet_contrastive.py) and [UME Architecture](#architecture).
+- **Architecture:** EfficientNet-style 1D CNN (stem convolution, 16 MBConv1D blocks with squeeze-and-excitation, head convolution, global average pooling, linear projection). See [`ume/model/efficientnet_contrastive.py`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/ume/model/efficientnet_contrastive.py) and [UME Architecture](#architecture).
 - **Training objective:** sample-wise contrastive learning (InfoNCE, temperature 0.1) between two augmented views of the same window, using the EDA augmentations of [Matton et al. (2024)](https://github.com/kmatton/contrastive-learning-for-eda).
 - **Files:** see [Checkpoints and Weights](#checkpoints).
 - **Developed by:** Leonardo Alchieri, Università della Svizzera italiana (USI).
@@ -127,7 +129,7 @@ Downstream evaluation (frozen features and a classical classifier, validated lea
 
 ### Pixi (recommended)
 
-The environment is defined in [`pixi.toml`](pixi.toml). Install [Pixi](https://pixi.sh), then:
+The environment is defined in [`pixi.toml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/pixi.toml). Install [Pixi](https://pixi.sh), then:
 
 ```bash
 git clone https://github.com/LeonardoAlchieri/eda-foundation-models.git
@@ -144,7 +146,7 @@ pip install -e .            # inference and fine-tuning (UMEPipeline)
 pip install -e ".[train]"   # + everything train.py needs for pretraining
 ```
 
-Other extras: `mantis` (Mantis-8M backbone), `dev` (pytest, black, flake8, isort), `notebook`. See [INSTALL.md](INSTALL.md).
+Other extras: `mantis` (Mantis-8M backbone), `dev` (pytest, black, flake8, isort), `notebook`. See [INSTALL.md](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/INSTALL.md).
 
 ### Optional: downstream evaluation
 
@@ -292,7 +294,7 @@ python train.py --config-name conf-ume pretrain.dataset.subsample=0.5
 python train.py --config-name conf-ume pretrain.dataset.subsample=0.75
 ```
 
-We also provide templates for sweeps for the model and dataset size (see [sweep-ume-ablation-size.yaml](configs/sweep-ume-ablation-size.yaml) and [sweep-ume-ablation-subsample.yaml](configs/sweep-ume-ablation-subsample.yaml)).
+We also provide templates for sweeps for the model and dataset size (see [sweep-ume-ablation-size.yaml](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/sweep-ume-ablation-size.yaml) and [sweep-ume-ablation-subsample.yaml](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/sweep-ume-ablation-subsample.yaml)).
 
 ---
 
@@ -307,7 +309,7 @@ UME was pretrained on 🫛 **EDAMAME**, which we release in two versions:
 
 See the [EDAMAME repository](https://github.com/LeonardoAlchieri/EDAMAME) for a description of the collection and the [EDAMAME website](https://pc.inf.usi.ch/datasets/edamame/) for access to both versions. The data itself is **not** included in this repository.
 
-The base UME was pretrained on these datasets from the collection (the list in [`configs/conf-ume.yaml`](configs/conf-ume.yaml)):
+The base UME was pretrained on these datasets from the collection (the list in [`configs/conf-ume.yaml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/conf-ume.yaml)):
 
 BiHeartS, big-ideas-glycemic-wearable, Dynamics, EmpaticaE4Stress, EPM, LAUREATE, MEFAR, M2Sleep, PPG_FieldStudy, SEED, SEED-II-Lab, SEED-II-Wild, Stress Predict Dataset, ToadStool, WEEE, WESD, Workplaces.
 
@@ -338,7 +340,7 @@ Input (N, T, C)
   -> Contrastive loss on two augmented views
 ```
 
-Base preset (default), set through the `model_size` presets in [`configs/conf-ume.yaml`](configs/conf-ume.yaml):
+Base preset (default), set through the `model_size` presets in [`configs/conf-ume.yaml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/conf-ume.yaml):
 
 | Parameter | Base Value |
 |-----------|------------|
@@ -354,8 +356,8 @@ Base preset (default), set through the `model_size` presets in [`configs/conf-um
 
 Contrastive training setup (augmentations, optimizer, scheduler):
 
-- [`configs/pretrain/contrastive.yaml`](configs/pretrain/contrastive.yaml)
-- [`configs/pretrain/engine/contrastive.yaml`](configs/pretrain/engine/contrastive.yaml)
+- [`configs/pretrain/contrastive.yaml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/pretrain/contrastive.yaml)
+- [`configs/pretrain/engine/contrastive.yaml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/pretrain/engine/contrastive.yaml)
 
 ---
 
@@ -367,7 +369,7 @@ We recommend the **base UME** preset, and only its weights are released. The oth
 
 ### UME model-size presets
 
-Defined in [`configs/conf-ume.yaml`](configs/conf-ume.yaml):
+Defined in [`configs/conf-ume.yaml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/conf-ume.yaml):
 
 | Preset | Stem | MBConv | Blocks | Head | Embedding | Kernel | Dropout |
 |--------|------|--------|--------|------|-----------|--------|---------|
@@ -376,7 +378,7 @@ Defined in [`configs/conf-ume.yaml`](configs/conf-ume.yaml):
 | `base` | `64` | `64` | `16` | `248` | `64` | `3`  | `0.1` |
 | `large`| `96` | `96` | `24` | `384` | `96` | `11` | `0.1` |
 
-Sweeps over model size and pretraining-data size: [`sweep-ume-ablation-size.yaml`](configs/sweep-ume-ablation-size.yaml) and [`sweep-ume-ablation-subsample.yaml`](configs/sweep-ume-ablation-subsample.yaml).
+Sweeps over model size and pretraining-data size: [`sweep-ume-ablation-size.yaml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/sweep-ume-ablation-size.yaml) and [`sweep-ume-ablation-subsample.yaml`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/configs/sweep-ume-ablation-subsample.yaml).
 
 ---
 
@@ -388,9 +390,9 @@ Three files hold the same base UME weights:
 
 | File | Contents | Use it for |
 |------|----------|------------|
-| [`model.safetensors`](model.safetensors) + [`config.json`](config.json) | Encoder weights in [safetensors](https://huggingface.co/docs/safetensors) format, with the model config. Holds tensors only, so loading never runs code. This is what `from_pretrained()` downloads from the Hugging Face Hub. | Inference and fine-tuning (recommended). |
-| [`artifacts/ume_base_inference.pt`](artifacts/ume_base_inference.pt) | Encoder `state_dict` and model config in one PyTorch file. Loads with `torch.load(..., weights_only=True)`. | Same as above, without the safetensors dependency. |
-| [`artifacts/ume_base_training.ckpt`](artifacts/ume_base_training.ckpt) | Full PyTorch Lightning checkpoint, including optimizer and scheduler state. Needs `weights_only=False`. | Resuming or inspecting training. |
+| [`model.safetensors`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/model.safetensors) + [`config.json`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/config.json) | Encoder weights in [safetensors](https://huggingface.co/docs/safetensors) format, with the model config. Holds tensors only, so loading never runs code. This is what `from_pretrained()` downloads from the Hugging Face Hub. | Inference and fine-tuning (recommended). |
+| [`artifacts/ume_base_inference.pt`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/artifacts/ume_base_inference.pt) | Encoder `state_dict` and model config in one PyTorch file. Loads with `torch.load(..., weights_only=True)`. | Same as above, without the safetensors dependency. |
+| [`artifacts/ume_base_training.ckpt`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/artifacts/ume_base_training.ckpt) | Full PyTorch Lightning checkpoint, including optimizer and scheduler state. Needs `weights_only=False`. | Resuming or inspecting training. |
 
 **Are they the same model?** Yes. All three hold the same 366 encoder tensors, bit-for-bit, and give identical embeddings. They differ only in what else they contain:
 
@@ -434,7 +436,7 @@ If you use UME, please cite the paper ([doi.org/10.1145/3857981](https://doi.org
 
 ## 📄 License
 
-This project is licensed under the MIT License. See [`LICENSE`](LICENSE).
+This project is licensed under the MIT License. See [`LICENSE`](https://github.com/LeonardoAlchieri/eda-foundation-models/blob/main/LICENSE).
 
 ---
 

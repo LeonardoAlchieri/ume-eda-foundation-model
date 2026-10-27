@@ -83,7 +83,7 @@ EXTRAS_REQUIRE["all"] = sorted(
 )
 
 setup(
-    name="ume",
+    name="ume-eda",
     version=read_version(),
     description="UME: a foundation model for wearable electrodermal-activity (EDA) signals.",
     long_description=read_long_description(),
@@ -100,7 +100,6 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.12",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
